@@ -34,6 +34,7 @@ jobs:
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
+          echo "src-git momo https://github.com/nikkinikki-org/OpenWrt-momo.git;main" >> feeds.conf.default
 
       - name: Update feeds
         run: |
@@ -61,19 +62,13 @@ jobs:
         id: notes
         run: |
           cd openwrt
-          # 获取内核版本
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 | awk -F'=' '{print $2}' | tr -d ' ')
           if [ -z "$KERNEL_VER" ]; then KERNEL_VER="6.12.x"; fi
-          
-          # 获取系统版本
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
-          
-          # 获取已选中的 luci-app 插件列表
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g' | sed 's/=y//g' | sort | tr '\n' ', ' | sed 's/,$//')
           
-          # 写入 Release Notes 文件
           cat > release_notes.txt <<EOF
-          ### 🚀 ImmortalWrt RAX3000M 专属固件
+          ### 🚀 ImmortalWrt RAX3000M 专属固件 (Momo + PT 满血版)
           
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
           **系统版本**: ImmortalWrt $SYSTEM_VER
@@ -88,9 +83,8 @@ jobs:
           ---
           
           ### 💡 刷机提示
-          *   **首次刷机**: 请使用 `factory.bin` (通过 U-Boot Web 刷入)
-          *   **升级固件**: 请使用 `sysupgrade.bin` (在 LuCI 后台或 U-Boot 刷入)
-          *   **默认地址**: 192.168.1.1 或 192.168.6.1
+          *   **首次刷机**: 请使用 `factory.bin`
+          *   **升级固件**: 请使用 `sysupgrade.bin`
           EOF
           
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
