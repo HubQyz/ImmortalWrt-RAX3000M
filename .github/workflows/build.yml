@@ -57,11 +57,25 @@ jobs:
           cd openwrt
           $GITHUB_WORKSPACE/diy-part2.sh
 
-      - name: Load config
+            - name: Load config
         run: |
           cd openwrt
           cp ../.config .config
           make defconfig
+          echo ""
+          echo "========== 包配置检查 =========="
+          echo "--- 你要求编译但被静默丢弃的包 ---"
+          comm -23 \
+            <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
+            <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
+            || echo "(无丢弃)"
+          echo ""
+          echo "--- 最终编入固件的 luci-app 插件 ---"
+          grep "^CONFIG_PACKAGE_luci-app-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
+          echo ""
+          echo "--- 最终编入固件的其他包 ---"
+          grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
+          echo "================================"
 
       - name: Download
         run: |
