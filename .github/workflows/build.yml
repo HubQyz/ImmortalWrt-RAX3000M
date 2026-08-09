@@ -32,7 +32,7 @@ jobs:
         run: |
           cd openwrt
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git packages https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
+          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
 
       - name: Update feeds
