@@ -77,3 +77,44 @@ mkdir -p files/etc/config
 [ -f "$LUCKY_UCI" ] && cp "$LUCKY_UCI" files/etc/config/lucky
 
 echo ">>> diy-part2.sh done."
+# ========== 4. 集成 TrguiNG Web UI (替代过时的 Transmission Web Control) ==========
+TRGUING_VERSION="v1.5.1-ee"
+TRGUING_ZIP="trguing-web-v1.5.1-ee.zip"
+TRGUING_URL="https://github.com/ManuZhu0728/TrguiNG/releases/download/${TRGUING_VERSION}/${TRGUING_ZIP}"
+TRGUING_DIR="files/usr/share/transmission/trguing"
+
+echo ">>> Downloading TrguiNG Web UI..."
+mkdir -p "$TRGUING_DIR"
+if wget -q --timeout=30 -O /tmp/trguing-web.zip "$TRGUING_URL"; then
+    unzip -qo /tmp/trguing-web.zip -d "$TRGUING_DIR"
+    rm -f /tmp/trguing-web.zip
+    echo ">>> TrguiNG Web UI extracted to $TRGUING_DIR"
+else
+    echo ">>> WARNING: Failed to download TrguiNG, trying mirror..."
+    # 备用：如果 GitHub 下载失败，尝试 ghproxy 镜像
+    if wget -q --timeout=30 -O /tmp/trguing-web.zip "https://ghfast.top/${TRGUING_URL}"; then
+        unzip -qo /tmp/trguing-web.zip -d "$TRGUING_DIR"
+        rm -f /tmp/trguing-web.zip
+        echo ">>> TrguiNG Web UI extracted (via mirror)."
+    else
+        echo ">>> ERROR: Failed to download TrguiNG from all sources!"
+    fi
+fi
+
+# ========== 5. 修改 transmission init 脚本，设置 TRANSMISSION_WEB_HOME ==========
+# OpenWrt 官方 transmission init 脚本已支持 web_home 参数[[38]]
+# 但我们需要确保 UCI 配置里有这个选项
+TR_UCI="package/feeds/packages/transmission/files/transmission.config"
+if [ ! -f "$TR_UCI" ]; then
+    # 尝试其他可能的路径
+    TR_UCI=$(find package/ -path "*/transmission/files/transmission.config" 2>/dev/null | head -1)
+fi
+if [ -n "$TR_UCI" ] && [ -f "$TR_UCI" ]; then
+    # 检查是否已有 web_home 配置，没有则添加
+    if ! grep -q "web_home" "$TR_UCI"; then
+        echo "	option web_home '/usr/share/transmission/trguing'" >> "$TR_UCI"
+        echo ">>> Added web_home to transmission default config."
+    fi
+fi
+
+echo ">>> diy-part2.sh done."
