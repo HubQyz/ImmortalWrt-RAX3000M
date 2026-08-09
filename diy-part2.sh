@@ -118,3 +118,7 @@ if [ -n "$TR_UCI" ] && [ -f "$TR_UCI" ]; then
 fi
 
 echo ">>> diy-part2.sh done."
+# ========== 6. 删除 transmission-web-control (与 transmission-web 文件冲突) ==========
+rm -rf package/feeds/kenzok8/transmission-web-control
+rm -rf package/feeds/small/transmission-web-control
+echo ">>> Removed transmission-web-control (conflicts with transmission-web)."
