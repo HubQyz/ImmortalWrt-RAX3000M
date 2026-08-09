@@ -1,16 +1,23 @@
 #!/bin/bash
 # ============================================================
-# diy-part1.sh — 在 feeds 更新之前执行
-# 作用：添加自定义软件源、克隆额外 package
+# diy-part1.sh — 在 feeds update 之前执行
 # ============================================================
 
-# ---------- 移除 feeds.conf 里可能存在的 sirpdboy lucky ----------
-sed -i '/luci-app-lucky/d' feeds.conf.default
-sed -i '/sirpdboy.*lucky/d' feeds.conf.default
+# ---------- 1. 删除 kenzok8 feed 自带的 sirpdboy lucky ----------
+# kenzok8/openwrt-packages 里有 luci-app-lucky (sirpdboy版)
+# 它的 init 脚本不兼容 ImmortalWrt 25.12 procd，必须移除
+rm -rf package/feeds/kenzok8/luci-app-lucky
+rm -rf package/feeds/kenzok8/lucky
+rm -rf package/feeds/small/luci-app-lucky
+rm -rf package/feeds/small/lucky
 
-# ---------- 克隆 gdy666 官方 lucky 到 package 目录 ----------
-# gdy666 的仓库包含两个子包：lucky（主程序）和 luci-app-lucky（LuCI界面）
-# clone 到 package/lucky 后，编译系统会自动识别
+# 同时从 feeds.conf.default 里注释掉可能的重复源
+sed -i '/src-git.*lucky/d' feeds.conf.default
+
+echo ">>> Removed sirpdboy lucky from kenzok8 feeds."
+
+# ---------- 2. 克隆 gdy666 官方 lucky ----------
 git clone https://github.com/gdy666/luci-app-lucky.git package/lucky
 
-echo ">>> diy-part1.sh done: gdy666 lucky source added."
+echo ">>> Cloned gdy666/luci-app-lucky to package/lucky/"
+echo ">>> diy-part1.sh done."
