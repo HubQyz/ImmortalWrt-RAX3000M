@@ -1,16 +1,12 @@
 #!/bin/bash
 # ============================================================
-# diy-part2.sh — 在 feeds 安装之后执行
-# 作用：修补 init 脚本、设置默认配置、files/ 兜底覆盖
+# diy-part2.sh — 在 feeds install 之后执行
 # ============================================================
 
-# ========== 1. 修复 gdy666 lucky 的 init.d 脚本 ==========
-# 原版脚本有两个 bug 导致 ImmortalWrt 25.12 + procd 下无法启动：
-#   bug1: procd_set_param command $PROG 没加引号，参数被拆错
-#   bug2: stop_service 里 kill -9 自己的进程，procd 状态混乱
+# ========== 1. 修复 lucky init.d 脚本 (兼容 ImmortalWrt 25.12 procd) ==========
 LUCKY_INIT="package/lucky/lucky/files/lucky.init"
 if [ -f "$LUCKY_INIT" ]; then
-    echo ">>> Patching lucky init script for ImmortalWrt 25.12 procd..."
+    echo ">>> Patching lucky init script..."
     cat > "$LUCKY_INIT" << 'EOF'
 #!/bin/sh /etc/rc.common
 
@@ -57,27 +53,27 @@ start_service() {
 }
 EOF
     chmod +x "$LUCKY_INIT"
-    echo ">>> Lucky init script patched OK."
+    echo ">>> Lucky init patched OK."
 else
     echo ">>> WARNING: $LUCKY_INIT not found!"
 fi
 
-# ========== 2. 设置默认 UCI 配置 enabled=1 ==========
+# ========== 2. 设置默认 UCI enabled=1 ==========
 LUCKY_UCI="package/lucky/lucky/files/luckyuci"
 if [ -f "$LUCKY_UCI" ]; then
-    echo ">>> Setting lucky default enabled=1..."
     cat > "$LUCKY_UCI" << 'EOF'
 config lucky
 	option enabled '1'
 	option logger '1'
 	option configdir '/etc/config/lucky.daji'
 EOF
+    echo ">>> Lucky UCI default set to enabled=1."
 fi
 
-# ========== 3. files/ 兜底覆盖（双保险）==========
+# ========== 3. files/ 兜底覆盖 ==========
 mkdir -p files/etc/init.d
 mkdir -p files/etc/config
 [ -f "$LUCKY_INIT" ] && cp "$LUCKY_INIT" files/etc/init.d/lucky && chmod +x files/etc/init.d/lucky
 [ -f "$LUCKY_UCI" ] && cp "$LUCKY_UCI" files/etc/config/lucky
 
-echo ">>> diy-part2.sh done: lucky procd fix + files overlay applied."
+echo ">>> diy-part2.sh done."
