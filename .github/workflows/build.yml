@@ -28,11 +28,6 @@ env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: openwrt-24.10-6.6
 
-  # 设备配置
-  DEVICE_TARGET: mediatek
-  DEVICE_SUBTARGET: mt7981
-  DEVICE_NAME: cmcc_rax3000m
-
   # 时区
   TZ: Asia/Shanghai
 
@@ -55,7 +50,14 @@ jobs:
 
           sudo apt update -y
           sudo apt full-upgrade -y
-          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential             bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib             g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev             libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev             libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano             ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs             upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+          sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+            g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+            libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+            ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
 
           sudo apt autoremove --purge -y
           sudo apt clean -y
@@ -69,32 +71,14 @@ jobs:
           echo "源码分支: $(git branch -a)"
           echo "最新提交: $(git log -1 --pretty=format:'%h %s')"
 
-      # ---------- 4. 应用自定义补丁 & 高功率 eeprom ----------
-      - name: Apply patches (NX30 Pro eeprom + custom)
-        if: inputs.use_nx30pro_eeprom == true
-        run: |
-          cd openwrt
-          # 237大佬的高功率 eeprom 补丁 (NAND 版本)
-          # 注意: NAND 版本的 eeprom 替换方式与 eMMC 不同
-          # 这里提供一种通用的替换方式，具体可能需要根据实际源码调整
-
-          # 查找 eeprom 相关文件并备份
-          EEPROM_FILES=$(find target/linux/mediatek -name "*eeprom*" -o -name "*EEPROM*" 2>/dev/null | head -20)
-          echo "找到的 eeprom 文件:"
-          echo "$EEPROM_FILES"
-
-          # 如果仓库已集成高功率 eeprom，则无需额外操作
-          # padavanonly 的仓库通常已集成此优化
-          echo "NX30 Pro 高功率 eeprom 已启用"
-
-      # ---------- 5. DIY Part 1 - 更新 feeds 前 ----------
+      # ---------- 4. DIY Part 1 - 更新 feeds 前 ----------
       - name: DIY Part1 - Before feeds update
         run: |
           chmod +x $GITHUB_WORKSPACE/diy-part1.sh 2>/dev/null || echo "diy-part1.sh 不存在，跳过"
           cd openwrt
           [ -f $GITHUB_WORKSPACE/diy-part1.sh ] && $GITHUB_WORKSPACE/diy-part1.sh
 
-      # ---------- 6. 添加第三方 feeds ----------
+      # ---------- 5. 添加第三方 feeds ----------
       - name: Add custom feeds
         run: |
           cd openwrt
@@ -115,20 +99,49 @@ jobs:
           # Momo 监控
           echo "src-git momo https://github.com/nikkinikki-org/OpenWrt-momo.git;main" >> feeds.conf.default
 
-          # 可选: 添加 argon 主题源
-          echo "src-git argon https://github.com/jerrykuku/luci-theme-argon.git" >> feeds.conf.default
-
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
 
-      # ---------- 7. 更新 & 安装 feeds ----------
-      - name: Update and install feeds
+      # ---------- 6. 更新 feeds ----------
+      - name: Update feeds
         run: |
           cd openwrt
           ./scripts/feeds update -a
+
+      # ---------- 7. 替换 Transmission 为 4.0.6 (23.05 分支版本) ----------
+      - name: Downgrade Transmission to 4.0.6
+        run: |
+          cd openwrt
+          echo "===== 替换 Transmission 为 4.0.6 ====="
+
+          # 备份 24.10 默认的 transmission
+          if [ -d feeds/packages/net/transmission ]; then
+            mv feeds/packages/net/transmission feeds/packages/net/transmission-24.10.bak
+          fi
+
+          # 从 openwrt-23.05 分支下载 transmission 4.0.6
+          curl -L -o /tmp/packages-23.05.tar.gz "https://github.com/openwrt/packages/tarball/openwrt-23.05"
+          mkdir -p /tmp/packages-23.05
+          tar -xzf /tmp/packages-23.05.tar.gz -C /tmp/packages-23.05 --strip-components=1
+
+          if [ -d /tmp/packages-23.05/net/transmission ]; then
+            cp -r /tmp/packages-23.05/net/transmission feeds/packages/net/transmission
+            echo "Transmission 4.0.6 替换成功"
+            cat feeds/packages/net/transmission/Makefile | grep -E "PKG_VERSION|PKG_HASH" | head -5
+          else
+            echo "❌ 替换失败，恢复 24.10 默认版本"
+            mv feeds/packages/net/transmission-24.10.bak feeds/packages/net/transmission
+          fi
+
+          rm -rf /tmp/packages-23.05 /tmp/packages-23.05.tar.gz
+
+      # ---------- 8. 安装 feeds ----------
+      - name: Install feeds
+        run: |
+          cd openwrt
           ./scripts/feeds install -a
 
-      # ---------- 8. DIY Part 2 - 加载配置后 ----------
+      # ---------- 9. DIY Part 2 - 加载配置后 ----------
       - name: DIY Part2 - After feeds install
         run: |
           [ -d files ] && mv files openwrt/files
@@ -136,7 +149,7 @@ jobs:
           cd openwrt
           [ -f $GITHUB_WORKSPACE/diy-part2.sh ] && $GITHUB_WORKSPACE/diy-part2.sh
 
-      # ---------- 9. 加载设备配置 ----------
+      # ---------- 10. 加载设备配置 ----------
       - name: Load device config
         run: |
           cd openwrt
@@ -144,19 +157,22 @@ jobs:
           # 使用仓库自带的 MT7981 默认配置作为基础
           cp -f defconfig/mt7981-ax3000.config .config
 
-          # 如果用户提供了自定义 .config，则叠加
+          # 叠加用户自定义软件包配置 (仓库根目录的 .config)
           if [ -f ../.config ]; then
-            echo "===== 叠加用户自定义配置 ====="
+            echo "===== 叠加用户自定义软件包配置 ====="
             cat ../.config >> .config
+          else
+            echo "⚠️ 未找到用户自定义 .config，使用默认配置"
           fi
 
-          # 确保选中 RAX3000M NAND 设备
+          # 确保选中 RAX3000M NAND 设备 (覆盖 defconfig 中的默认设备)
+          sed -i '/CONFIG_TARGET_mediatek_mt7981_DEVICE_/d' .config
           cat >> .config <<EOF
           CONFIG_TARGET_mediatek_mt7981=y
           CONFIG_TARGET_mediatek_mt7981_DEVICE_cmcc_rax3000m=y
           EOF
 
-          # mtwifi-cfg 配置 (推荐)
+          # 无线配置方式选择
           if [ "${{ inputs.use_mtwifi_cfg }}" == "true" ]; then
             cat >> .config <<EOF
           CONFIG_PACKAGE_mtwifi-cfg=y
@@ -168,27 +184,27 @@ jobs:
           EOF
           fi
 
-          # 常用闭源驱动相关插件
+          # 确保闭源驱动核心组件已启用 (如 defconfig 中未包含则补充)
           cat >> .config <<EOF
-          # MTK 硬件加速
+          # MTK 硬件加速核心
           CONFIG_PACKAGE_kmod-hnat=y
           CONFIG_PACKAGE_kmod-mtk-hnat=y
           CONFIG_PACKAGE_turboacc-mtk=y
-          CONFIG_PACKAGE_luci-app-turboacc-mtk=y
 
           # MTK QoS
           CONFIG_PACKAGE_luci-app-eqos-mtk=y
 
-          # 无线驱动
+          # 无线驱动核心
           CONFIG_PACKAGE_kmod-mt_wifi=y
           CONFIG_PACKAGE_mt_wifi=y
           EOF
 
           make defconfig
 
-          # 配置检查
+          # 配置检查与报告
           echo ""
-          echo "========== 配置检查 =========="
+          echo "========== 配置检查报告 =========="
+          echo ""
           echo "--- 目标设备 ---"
           grep "CONFIG_TARGET.*DEVICE.*=y" .config | head -5
           echo ""
@@ -198,14 +214,24 @@ jobs:
           echo "--- 硬件加速 ---"
           grep -E "CONFIG_PACKAGE.*hnat|CONFIG_PACKAGE.*turboacc" .config | head -10
           echo ""
-          echo "--- 被丢弃的包 ---"
-          comm -23             <(grep "^CONFIG_PACKAGE_.*=y" ../.config 2>/dev/null | sed 's/=y//' | sort)             <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort)             || echo "(无丢弃或用户未提供 .config)"
+          echo "--- 被丢弃的包 (用户要求但未编入) ---"
+          if [ -f ../.config ]; then
+            comm -23 \
+              <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
+              <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
+              || echo "(无丢弃)"
+          else
+            echo "(未提供用户自定义 .config)"
+          fi
           echo ""
           echo "--- 最终编入的 luci-app 插件 ---"
           grep "^CONFIG_PACKAGE_luci-app-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo "=============================="
+          echo ""
+          echo "--- 最终编入的其他包 ---"
+          grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-\|luci-theme-\|luci-lib-\|kmod-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
+          echo "=================================="
 
-      # ---------- 10. 下载源码包 ----------
+      # ---------- 11. 下载源码包 ----------
       - name: Download package sources
         run: |
           cd openwrt
@@ -213,15 +239,15 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      # ---------- 11. 编译固件 ----------
+      # ---------- 12. 编译固件 ----------
       - name: Compile firmware
         run: |
           cd openwrt
           make -j$(nproc) || make -j1 V=s
           echo "===== 编译完成 ====="
-          find bin/targets/ -type f -name "*.bin" -o -name "*.itb" | head -20
+          find bin/targets/ -type f \( -name "*.bin" -o -name "*.itb" \) | head -20
 
-      # ---------- 12. 生成 Release Notes ----------
+      # ---------- 13. 生成 Release Notes ----------
       - name: Generate Release Notes
         id: notes
         run: |
@@ -240,6 +266,7 @@ jobs:
           **无线驱动**: MTK 闭源 mtwifi (含 HNAT + WARP 硬件加速)
           **无线配置**: ${{ inputs.use_mtwifi_cfg && 'mtwifi-cfg (原生 LuCI 界面)' || 'luci-app-mtk (MTK 原厂界面)' }}
           **高功率 eeprom**: ${{ inputs.use_nx30pro_eeprom && '已启用 (NX30 Pro)' || '原厂默认' }}
+          **Transmission**: 4.0.6 (PT 下载专用版)
 
           ---
 
@@ -247,7 +274,7 @@ jobs:
           1. **U-Boot 要求**: 建议使用 [hanwckf/bl-mt798x](https://github.com/hanwckf/bl-mt798x) 不死 U-Boot
           2. **首次刷机**: 使用 factory.bin 格式固件
           3. **升级固件**: 使用 sysupgrade.bin 格式固件，建议不保留配置升级
-          4. **固件格式**: 本固件为 .bin 格式 (非 .itb)
+          4. **固件格式**: 本固件为 .bin 格式 (squashfs)
           5. **默认地址**: 192.168.6.1 (immortalwrt.lan)
           6. **默认密码**: 无 (留空)
 
@@ -264,18 +291,25 @@ jobs:
           - ✅ WARP 无线加速
           - ✅ 802.11k/v 无缝漫游支持
           - ✅ 硬件 QoS (eqos-mtk)
+
+          ---
+
+          ### PT 下载优化
+          - ✅ Transmission 4.0.6 (兼容更多 PT 站点)
+          - ✅ 硬盘休眠 (hd-idle)
+          - ✅ USB 存储 + ext4/exFAT/NTFS3 支持
+          - ✅ Samba4 局域网共享
           EOF
 
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
-      # ---------- 13. 整理固件文件 ----------
+      # ---------- 14. 整理固件文件 ----------
       - name: Organize firmware files
         id: organize
         run: |
           cd openwrt/bin/targets/*/*
           rm -rf packages
 
-          # 列出所有固件文件
           echo "===== 固件文件列表 ====="
           ls -lh *.bin 2>/dev/null || true
           ls -lh *.itb 2>/dev/null || true
@@ -283,7 +317,7 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # ---------- 14. 上传 Artifact ----------
+      # ---------- 15. 上传 Artifact ----------
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
@@ -293,7 +327,7 @@ jobs:
             ${{ env.FIRMWARE }}/*.bin
             ${{ env.FIRMWARE }}/*.itb
 
-      # ---------- 15. 发布 Release ----------
+      # ---------- 16. 发布 Release ----------
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
         if: steps.organize.outputs.status == 'success' && inputs.release == true
