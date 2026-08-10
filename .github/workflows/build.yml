@@ -74,9 +74,13 @@ jobs:
       # ---------- 4. DIY Part 1 - 更新 feeds 前 ----------
       - name: DIY Part1 - Before feeds update
         run: |
-          chmod +x $GITHUB_WORKSPACE/diy-part1.sh 2>/dev/null || echo "diy-part1.sh 不存在，跳过"
-          cd openwrt
-          [ -f $GITHUB_WORKSPACE/diy-part1.sh ] && $GITHUB_WORKSPACE/diy-part1.sh
+          if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
+            cd openwrt
+            "$GITHUB_WORKSPACE/diy-part1.sh"
+          else
+            echo "diy-part1.sh 不存在，跳过"
+          fi
 
       # ---------- 5. 添加第三方 feeds ----------
       - name: Add custom feeds
@@ -144,10 +148,14 @@ jobs:
       # ---------- 9. DIY Part 2 - 加载配置后 ----------
       - name: DIY Part2 - After feeds install
         run: |
-          [ -d files ] && mv files openwrt/files
-          chmod +x $GITHUB_WORKSPACE/diy-part2.sh 2>/dev/null || echo "diy-part2.sh 不存在，跳过"
-          cd openwrt
-          [ -f $GITHUB_WORKSPACE/diy-part2.sh ] && $GITHUB_WORKSPACE/diy-part2.sh
+          [ -d files ] && mv files openwrt/files || true
+          if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
+            chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
+            cd openwrt
+            "$GITHUB_WORKSPACE/diy-part2.sh"
+          else
+            echo "diy-part2.sh 不存在，跳过"
+          fi
 
       # ---------- 10. 加载设备配置 ----------
       - name: Load device config
