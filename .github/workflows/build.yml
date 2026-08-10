@@ -112,34 +112,11 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
 
-      # ---------- 7. 替换 Transmission 为 4.0.6 (23.05 分支版本) ----------
-      - name: Downgrade Transmission to 4.0.6
+      # ---------- 7. 安装 feeds ----------
+      - name: Install feeds
         run: |
           cd openwrt
-          echo "===== 替换 Transmission 为 4.0.6 ====="
-
-          # 备份 24.10 默认的 transmission
-          if [ -d feeds/packages/net/transmission ]; then
-            mv feeds/packages/net/transmission feeds/packages/net/transmission-24.10.bak
-          fi
-
-          # 从 openwrt-23.05 分支下载 transmission 4.0.6
-          curl -L -o /tmp/packages-23.05.tar.gz "https://github.com/openwrt/packages/tarball/openwrt-23.05"
-          mkdir -p /tmp/packages-23.05
-          tar -xzf /tmp/packages-23.05.tar.gz -C /tmp/packages-23.05 --strip-components=1
-
-          if [ -d /tmp/packages-23.05/net/transmission ]; then
-            cp -r /tmp/packages-23.05/net/transmission feeds/packages/net/transmission
-            echo "Transmission 4.0.6 替换成功"
-            cat feeds/packages/net/transmission/Makefile | grep -E "PKG_VERSION|PKG_HASH" | head -5
-          else
-            echo "❌ 替换失败，恢复 24.10 默认版本"
-            mv feeds/packages/net/transmission-24.10.bak feeds/packages/net/transmission
-          fi
-
-          rm -rf /tmp/packages-23.05 /tmp/packages-23.05.tar.gz
-
-      # ---------- 8. 安装 feeds ----------
+          ./scripts/feeds install -a
       - name: Install feeds
         run: |
           cd openwrt
