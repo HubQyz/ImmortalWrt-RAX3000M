@@ -13,8 +13,11 @@ env:
   # ==========================================
   # 源码配置 - ImmortalWrt 官方 25.12 稳定版
   # ==========================================
+  # ⚠️ 注意：这里使用稳定版标签 v25.12.1，不是开发分支 openwrt-25.12
+  # v25.12.1 = 已发布的稳定版 (2026-07-06)
+  # openwrt-25.12 = 开发分支，每日自动构建，不稳定
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-25.12
+  REPO_BRANCH: v25.12.1
 
   # 时区
   TZ: Asia/Shanghai
@@ -181,7 +184,7 @@ jobs:
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
 
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
-          **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12 稳定版)
+          **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
           **Linux 内核**: $KERNEL_VER
           **目标设备**: CMCC RAX3000M (MT7981 / NAND 128M)
           **目标平台**: mediatek/filogic
@@ -235,7 +238,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
         with:
-          name: ImmortalWrt-RAX3000M-NAND-Official-25.12-${{ github.run_number }}
+          name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
           path: |
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
@@ -247,8 +250,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: RAX3000M-NAND-Official-25.12-${{ github.run_number }}
-          name: ImmortalWrt-RAX3000M-NAND-Official-25.12-Build-${{ github.run_number }}
+          tag_name: RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
+          name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-Build-${{ github.run_number }}
           body_path: openwrt/release_notes.txt
           files: |
             ${{ env.FIRMWARE }}/*.itb
