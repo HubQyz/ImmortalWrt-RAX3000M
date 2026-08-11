@@ -245,7 +245,7 @@ jobs:
 
       # ---------- 14. 发布 Release ----------
       - name: Release to GitHub
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: steps.organize.outputs.status == 'success' && inputs.release == true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
