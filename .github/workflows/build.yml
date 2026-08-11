@@ -235,7 +235,7 @@ jobs:
 
       # ---------- 13. 上传 Artifact ----------
       - name: Upload firmware artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success'
         with:
           name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
