@@ -1,18 +1,8 @@
-name: Build ImmortalWrt RAX3000M NAND (Closed-Source Driver)
+name: Build ImmortalWrt RAX3000M NAND (Official 25.12 Stable)
 
 on:
   workflow_dispatch:
     inputs:
-      use_nx30pro_eeprom:
-        description: '使用 NX30 Pro 高功率 eeprom (2.4G:25dBm, 5G:24dBm)'
-        required: true
-        default: true
-        type: boolean
-      use_mtwifi_cfg:
-        description: '使用 mtwifi-cfg 原生 LuCI 无线界面 (推荐)'
-        required: true
-        default: true
-        type: boolean
       release:
         description: '发布到 Release'
         required: true
@@ -21,12 +11,10 @@ on:
 
 env:
   # ==========================================
-  # 源码配置 - 闭源驱动方案 (推荐)
+  # 源码配置 - ImmortalWrt 官方 25.12 稳定版
   # ==========================================
-  # 237大佬维护的 mt798x 闭源驱动仓库，基于 ImmortalWrt 24.10，内核 6.6
-  # 特点: 闭源 mtwifi 驱动 + HNAT 硬件加速 + WARP 无线加速，稳定性好
-  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
-  REPO_BRANCH: openwrt-24.10-6.6
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: openwrt-25.12
 
   # 时区
   TZ: Asia/Shanghai
@@ -87,10 +75,6 @@ jobs:
         run: |
           cd openwrt
 
-          # 注意: 闭源驱动仓库已自带 mtk-openwrt-feeds，请勿重复添加
-          # 以下 feeds 为可选第三方源，可能与闭源驱动存在兼容性问题
-          # 如遇编译错误，请注释掉有问题的 feeds
-
           # small 包 (代理工具依赖)
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
 
@@ -106,23 +90,14 @@ jobs:
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
 
-      # ---------- 6. 更新 feeds ----------
-      - name: Update feeds
+      # ---------- 6. 更新 & 安装 feeds ----------
+      - name: Update and install feeds
         run: |
           cd openwrt
           ./scripts/feeds update -a
-
-      # ---------- 7. 安装 feeds ----------
-      - name: Install feeds
-        run: |
-          cd openwrt
-          ./scripts/feeds install -a
-      - name: Install feeds
-        run: |
-          cd openwrt
           ./scripts/feeds install -a
 
-      # ---------- 9. DIY Part 2 - 加载配置后 ----------
+      # ---------- 7. DIY Part 2 - 加载配置后 ----------
       - name: DIY Part2 - After feeds install
         run: |
           [ -d files ] && mv files openwrt/files || true
@@ -134,54 +109,25 @@ jobs:
             echo "diy-part2.sh 不存在，跳过"
           fi
 
-      # ---------- 10. 加载设备配置 ----------
+      # ---------- 8. 加载设备配置 ----------
       - name: Load device config
         run: |
           cd openwrt
 
-          # 使用仓库自带的 MT7981 默认配置作为基础
-          cp -f defconfig/mt7981-ax3000.config .config
-
-          # 叠加用户自定义软件包配置 (仓库根目录的 .config)
+          # 加载用户自定义软件包配置
           if [ -f ../.config ]; then
-            echo "===== 叠加用户自定义软件包配置 ====="
-            cat ../.config >> .config
+            echo "===== 加载用户自定义配置 ====="
+            cp ../.config .config
           else
-            echo "⚠️ 未找到用户自定义 .config，使用默认配置"
+            echo "⚠️ 未找到用户自定义 .config"
+            exit 1
           fi
 
-          # 确保选中 RAX3000M NAND 设备 (覆盖 defconfig 中的默认设备)
-          sed -i '/CONFIG_TARGET_mediatek_mt7981_DEVICE_/d' .config
+          # 确保选中 RAX3000M NAND 设备 (25.12 属于 filogic target)
           cat >> .config <<EOF
-          CONFIG_TARGET_mediatek_mt7981=y
-          CONFIG_TARGET_mediatek_mt7981_DEVICE_cmcc_rax3000m=y
-          EOF
-
-          # 无线配置方式选择
-          if [ "${{ inputs.use_mtwifi_cfg }}" == "true" ]; then
-            cat >> .config <<EOF
-          CONFIG_PACKAGE_mtwifi-cfg=y
-          CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
-          EOF
-          else
-            cat >> .config <<EOF
-          CONFIG_PACKAGE_luci-app-mtk=y
-          EOF
-          fi
-
-          # 确保闭源驱动核心组件已启用 (如 defconfig 中未包含则补充)
-          cat >> .config <<EOF
-          # MTK 硬件加速核心
-          CONFIG_PACKAGE_kmod-hnat=y
-          CONFIG_PACKAGE_kmod-mtk-hnat=y
-          CONFIG_PACKAGE_turboacc-mtk=y
-
-          # MTK QoS
-          CONFIG_PACKAGE_luci-app-eqos-mtk=y
-
-          # 无线驱动核心
-          CONFIG_PACKAGE_kmod-mt_wifi=y
-          CONFIG_PACKAGE_mt_wifi=y
+          CONFIG_TARGET_mediatek=y
+          CONFIG_TARGET_mediatek_filogic=y
+          CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
           EOF
 
           make defconfig
@@ -193,21 +139,11 @@ jobs:
           echo "--- 目标设备 ---"
           grep "CONFIG_TARGET.*DEVICE.*=y" .config | head -5
           echo ""
-          echo "--- 无线驱动 ---"
-          grep -E "CONFIG_PACKAGE.*mt_wifi|CONFIG_PACKAGE.*mtwifi" .config | head -10
-          echo ""
-          echo "--- 硬件加速 ---"
-          grep -E "CONFIG_PACKAGE.*hnat|CONFIG_PACKAGE.*turboacc" .config | head -10
-          echo ""
           echo "--- 被丢弃的包 (用户要求但未编入) ---"
-          if [ -f ../.config ]; then
-            comm -23 \
-              <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
-              <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
-              || echo "(无丢弃)"
-          else
-            echo "(未提供用户自定义 .config)"
-          fi
+          comm -23 \
+            <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
+            <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
+            || echo "(无丢弃)"
           echo ""
           echo "--- 最终编入的 luci-app 插件 ---"
           grep "^CONFIG_PACKAGE_luci-app-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
@@ -216,7 +152,7 @@ jobs:
           grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-\|luci-theme-\|luci-lib-\|kmod-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
           echo "=================================="
 
-      # ---------- 11. 下载源码包 ----------
+      # ---------- 9. 下载源码包 ----------
       - name: Download package sources
         run: |
           cd openwrt
@@ -224,7 +160,7 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      # ---------- 12. 编译固件 ----------
+      # ---------- 10. 编译固件 ----------
       - name: Compile firmware
         run: |
           cd openwrt
@@ -232,36 +168,36 @@ jobs:
           echo "===== 编译完成 ====="
           find bin/targets/ -type f \( -name "*.bin" -o -name "*.itb" \) | head -20
 
-      # ---------- 13. 生成 Release Notes ----------
+      # ---------- 11. 生成 Release Notes ----------
       - name: Generate Release Notes
         id: notes
         run: |
           cd openwrt
-          KERNEL_VER=$(grep "LINUX_VERSION-6.6" include/kernel-6.6 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.6.x")
-          SYSTEM_VER=$(cat version.date 2>/dev/null || echo "24.10-SNAPSHOT")
+          KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
+          SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g' | sed 's/=y//g' | sort | tr '\n' ', ' | sed 's/,$//')
 
           cat > release_notes.txt <<EOF
-          ### ImmortalWrt RAX3000M NAND 闭源驱动固件
+          ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
 
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
-          **系统版本**: ImmortalWrt $SYSTEM_VER (闭源驱动版)
+          **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12 稳定版)
           **Linux 内核**: $KERNEL_VER
           **目标设备**: CMCC RAX3000M (MT7981 / NAND 128M)
-          **无线驱动**: MTK 闭源 mtwifi (含 HNAT + WARP 硬件加速)
-          **无线配置**: ${{ inputs.use_mtwifi_cfg && 'mtwifi-cfg (原生 LuCI 界面)' || 'luci-app-mtk (MTK 原厂界面)' }}
-          **高功率 eeprom**: ${{ inputs.use_nx30pro_eeprom && '已启用 (NX30 Pro)' || '原厂默认' }}
-          **Transmission**: 4.0.6 (PT 下载专用版)
+          **目标平台**: mediatek/filogic
+          **无线驱动**: mt76 开源驱动
+          **固件格式**: .itb (FIT image)
+          **包管理器**: apk (Alpine Package Keeper)
 
           ---
 
           ### ⚠️ 刷机须知
-          1. **U-Boot 要求**: 建议使用 [hanwckf/bl-mt798x](https://github.com/hanwckf/bl-mt798x) 不死 U-Boot
-          2. **首次刷机**: 使用 factory.bin 格式固件
-          3. **升级固件**: 使用 sysupgrade.bin 格式固件，建议不保留配置升级
-          4. **固件格式**: 本固件为 .bin 格式 (squashfs)
-          5. **默认地址**: 192.168.6.1 (immortalwrt.lan)
-          6. **默认密码**: 无 (留空)
+          1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
+          2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
+          3. **升级固件**: 使用 sysupgrade.itb，建议不保留配置升级
+          4. **默认地址**: 192.168.1.1 或 192.168.6.1 (immortalwrt.lan)
+          5. **默认密码**: 无 (留空)
+          6. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
 
           ---
 
@@ -270,25 +206,17 @@ jobs:
 
           ---
 
-          ### 闭源驱动特性
-          - ✅ MTK 原厂 mtwifi 无线驱动 (信号更强，2.4G/5G 功率更高)
-          - ✅ HNAT 硬件 NAT 加速 (NAT 转发性能大幅提升)
-          - ✅ WARP 无线加速
-          - ✅ 802.11k/v 无缝漫游支持
-          - ✅ 硬件 QoS (eqos-mtk)
-
-          ---
-
-          ### PT 下载优化
-          - ✅ Transmission 4.0.6 (兼容更多 PT 站点)
-          - ✅ 硬盘休眠 (hd-idle)
-          - ✅ USB 存储 + ext4/exFAT/NTFS3 支持
-          - ✅ Samba4 局域网共享
+          ### 特性说明
+          - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
+          - ✅ mt76 开源无线驱动，社区维护
+          - ✅ IPv6 支持完善，无已知严重 bug
+          - ✅ 软件包管理器: apk (Alpine Package Keeper)
+          - ✅ 内核 6.12 LTS，长期支持
           EOF
 
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
-      # ---------- 14. 整理固件文件 ----------
+      # ---------- 12. 整理固件文件 ----------
       - name: Organize firmware files
         id: organize
         run: |
@@ -296,32 +224,32 @@ jobs:
           rm -rf packages
 
           echo "===== 固件文件列表 ====="
-          ls -lh *.bin 2>/dev/null || true
           ls -lh *.itb 2>/dev/null || true
+          ls -lh *.bin 2>/dev/null || true
 
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # ---------- 15. 上传 Artifact ----------
+      # ---------- 13. 上传 Artifact ----------
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
         with:
-          name: ImmortalWrt-RAX3000M-NAND-ClosedSource-${{ github.run_number }}
+          name: ImmortalWrt-RAX3000M-NAND-Official-25.12-${{ github.run_number }}
           path: |
-            ${{ env.FIRMWARE }}/*.bin
             ${{ env.FIRMWARE }}/*.itb
+            ${{ env.FIRMWARE }}/*.bin
 
-      # ---------- 16. 发布 Release ----------
+      # ---------- 14. 发布 Release ----------
       - name: Release to GitHub
         uses: softprops/action-gh-release@v2
         if: steps.organize.outputs.status == 'success' && inputs.release == true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: RAX3000M-NAND-CS-${{ github.run_number }}
-          name: ImmortalWrt-RAX3000M-NAND-ClosedSource-Build-${{ github.run_number }}
+          tag_name: RAX3000M-NAND-Official-25.12-${{ github.run_number }}
+          name: ImmortalWrt-RAX3000M-NAND-Official-25.12-Build-${{ github.run_number }}
           body_path: openwrt/release_notes.txt
           files: |
-            ${{ env.FIRMWARE }}/*.bin
             ${{ env.FIRMWARE }}/*.itb
+            ${{ env.FIRMWARE }}/*.bin
