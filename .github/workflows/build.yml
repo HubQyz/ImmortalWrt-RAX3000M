@@ -138,6 +138,30 @@ jobs:
           CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
           EOF
           make defconfig
+
+      - name: Deep Clean Build Cache (Critical for Size Optimization)
+        run: |
+          cd openwrt
+          echo "===== 开始深度清理 ====="
+          
+          # 1. 清理编译中间文件 (必须)
+          make clean
+          
+          # 2. 强制删除构建目录和二进制输出 (防止旧包残留)
+          rm -rf bin/ build_dir/ tmp/
+          
+          # 3. 清理 ccache 缓存 (防止旧的二进制文件被复用)
+          # 注意：这会稍微增加本次编译时间，但能确保固件纯净
+          ccache -C || true
+          rm -rf .ccache/ ~/.ccache/
+          
+          # 4. 可选：清理下载缓存 (如果不想重新下载所有源码，可注释掉 dl/)
+          # rm -rf dl/ 
+          
+          echo "✅ 清理完成，当前磁盘使用："
+          df -h .
+          echo "========================="
+          
           echo ""
           echo "========== 配置检查报告 =========="
           echo "--- 目标设备 ---"
