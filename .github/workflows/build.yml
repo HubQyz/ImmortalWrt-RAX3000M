@@ -10,9 +10,6 @@ on:
         type: boolean
 
 env:
-  # ==========================================
-  # 源码配置 - ImmortalWrt 官方 25.12 稳定版
-  # ==========================================
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: v25.12.1
   TZ: Asia/Shanghai
@@ -21,11 +18,9 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      # ---------- 1. 检出仓库 ----------
       - name: Checkout
         uses: actions/checkout@v7
 
-      # ---------- 2. 初始化编译环境 ----------
       - name: Init build environment
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -33,7 +28,6 @@ jobs:
           docker rmi $(docker images -q) 2>/dev/null || true
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-
           sudo apt update -y
           sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
@@ -44,12 +38,10 @@ jobs:
             ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
             python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
             upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
-
           sudo apt autoremove --purge -y
           sudo apt clean -y
           sudo timedatectl set-timezone "$TZ"
 
-      # ---------- 3. 克隆源码 ----------
       - name: Clone source code
         run: |
           git clone --single-branch --filter=blob:none -b $REPO_BRANCH $REPO_URL openwrt
@@ -57,7 +49,6 @@ jobs:
           echo "源码分支: $(git branch -a)"
           echo "最新提交: $(git log -1 --pretty=format:'%h %s')"
 
-      # ---------- 4. DIY Part 1 - 更新 feeds 前 ----------
       - name: DIY Part1 - Before feeds update
         run: |
           if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
@@ -68,42 +59,31 @@ jobs:
             echo "diy-part1.sh 不存在，跳过"
           fi
 
-      # ---------- 5. 添加第三方 feeds ----------
       - name: Add custom feeds
         run: |
           cd openwrt
-
-          # ⚠️ 关键：删除所有已有的 packages feed 定义，防止重复
           sed -i '/^src-git packages/d' feeds.conf.default
-
-          # ✅ 使用 ImmortalWrt 25.12 对应的正确分支名 openwrt-25.12
-          # 注意：packages 仓库没有 v25.12.1 标签，必须用 openwrt-25.12 分支
           echo "src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12" >> feeds.conf.default
-
-          # small 包 (PassWall2 核心依赖)
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-
-          # kenzok8 插件库
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
-
-          # iStore 应用商店
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
-
+          echo "src-git sirpdboy https://github.com/sirpdboy/sirpdboy-package.git" >> feeds.conf.default
+          echo "src-git fantastic https://github.com/muink/fantastic-packages.git" >> feeds.conf.default
+          echo "src-git sbwml https://github.com/sbwml/openwrt-packages.git" >> feeds.conf.default
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
 
-      # ---------- 6. 更新 & 安装 feeds ----------
       - name: Update and install feeds
         run: |
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-
-          # ✅ Feeds 验证（警告模式：缺失包仅提示，不阻断编译）
           echo ""
           echo "========== Feeds 验证 =========="
           MISSING=""
-          for pkg in luci-app-passwall2 luci-app-p910nd luci-app-eqos luci-app-sqm luci-app-wrtbwmon; do
+          for pkg in luci-app-passwall2 luci-app-sqm luci-app-wrtbwmon \
+                     luci-app-subconverter luci-app-ddns-go luci-app-adguardhome luci-app-arpbind \
+                     luci-app-eqosplus luci-app-nft-timecontrol luci-app-bandix luci-app-quickfile; do
             if ./scripts/feeds list | grep -q "$pkg"; then
               echo "✅ $pkg 已在 feeds 中找到"
             else
@@ -115,11 +95,9 @@ jobs:
             echo ""
             echo "📌 以下包未在当前 feeds 中，已从 .config 中静默忽略："
             echo "  $MISSING"
-            echo "💡 提示：这些包可在刷机后通过 iStore 或 apk add 手动安装"
           fi
           echo "=================================="
 
-      # ---------- 7. DIY Part 2 - 加载配置后 ----------
       - name: DIY Part2 - After feeds install
         run: |
           [ -d files ] && mv files openwrt/files || true
@@ -131,11 +109,9 @@ jobs:
             echo "diy-part2.sh 不存在，跳过"
           fi
 
-      # ---------- 8. 加载设备配置 ----------
       - name: Load device config
         run: |
           cd openwrt
-
           if [ -f ../.config ]; then
             echo "===== 加载用户自定义配置 ====="
             cp ../.config .config
@@ -143,15 +119,12 @@ jobs:
             echo "⚠️ 未找到用户自定义 .config"
             exit 1
           fi
-
           cat >> .config <<EOF
           CONFIG_TARGET_mediatek=y
           CONFIG_TARGET_mediatek_filogic=y
           CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
           EOF
-
           make defconfig
-
           echo ""
           echo "========== 配置检查报告 =========="
           echo "--- 目标设备 ---"
@@ -170,7 +143,6 @@ jobs:
           grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-\|luci-theme-\|luci-lib-\|kmod-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
           echo "=================================="
 
-      # ---------- 9. 下载源码包 ----------
       - name: Download package sources
         run: |
           cd openwrt
@@ -178,7 +150,6 @@ jobs:
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      # ---------- 10. 编译固件 ----------
       - name: Compile firmware
         run: |
           cd openwrt
@@ -186,7 +157,6 @@ jobs:
           echo "===== 编译完成 ====="
           find bin/targets/ -type f \( -name "*.bin" -o -name "*.itb" \) | head -20
 
-      # ---------- 11. 生成 Release Notes ----------
       - name: Generate Release Notes
         id: notes
         run: |
@@ -194,10 +164,8 @@ jobs:
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
-
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
-
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
           **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
           **Linux 内核**: $KERNEL_VER
@@ -206,9 +174,7 @@ jobs:
           **无线驱动**: mt76 开源驱动
           **固件格式**: .itb (FIT image)
           **包管理器**: apk (Alpine Package Keeper)
-
           ---
-
           ### ⚠️ 刷机须知
           1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
           2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
@@ -216,14 +182,10 @@ jobs:
           4. **默认地址**: 192.168.1.1 或 192.168.6.1 (immortalwrt.lan)
           5. **默认密码**: 无 (留空)
           6. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
-
           ---
-
           ### 内置插件清单
           $PLUGINS
-
           ---
-
           ### 特性说明
           - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
           - ✅ mt76 开源无线驱动，社区维护
@@ -231,24 +193,19 @@ jobs:
           - ✅ 软件包管理器: apk (Alpine Package Keeper)
           - ✅ 内核 6.12 LTS，长期支持
           EOF
-
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
-      # ---------- 12. 整理固件文件 ----------
       - name: Organize firmware files
         id: organize
         run: |
           cd openwrt/bin/targets/*/*
           rm -rf packages
-
           echo "===== 固件文件列表 ====="
           ls -lh *.itb 2>/dev/null || true
           ls -lh *.bin 2>/dev/null || true
-
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # ---------- 13. 上传 Artifact ----------
       - name: Upload firmware artifact
         uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success'
@@ -258,7 +215,6 @@ jobs:
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
 
-      # ---------- 14. 发布 Release ----------
       - name: Release to GitHub
         uses: softprops/action-gh-release@v3
         if: steps.organize.outputs.status == 'success' && inputs.release == true
