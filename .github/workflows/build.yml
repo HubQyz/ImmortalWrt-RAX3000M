@@ -92,7 +92,7 @@ jobs:
           echo "========== Feeds 验证 =========="
           MISSING=""
           for pkg in luci-app-passwall2 luci-app-sqm luci-app-wrtbwmon \
-                     luci-app-subconverter luci-app-ddns-go luci-app-adguardhome luci-app-arpbind \
+                     luci-app-ddns-go luci-app-adguardhome luci-app-arpbind \
                      luci-app-eqosplus luci-app-nft-timecontrol luci-app-bandix luci-app-quickfile \
                      luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp \
                      luci-app-taskplan luci-app-netspeedtest; do
