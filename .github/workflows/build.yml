@@ -13,13 +13,8 @@ env:
   # ==========================================
   # 源码配置 - ImmortalWrt 官方 25.12 稳定版
   # ==========================================
-  # ⚠️ 注意：这里使用稳定版标签 v25.12.1，不是开发分支 openwrt-25.12
-  # v25.12.1 = 已发布的稳定版 (2026-07-06)
-  # openwrt-25.12 = 开发分支，每日自动构建，不稳定
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: v25.12.1
-
-  # 时区
   TZ: Asia/Shanghai
 
 jobs:
@@ -78,17 +73,17 @@ jobs:
         run: |
           cd openwrt
 
-          # ⚠️ 关键：删除 diy-part1.sh 或源码中可能重复添加的 packages feed，防止 Duplicate feed name 错误
-          # 保留 ImmortalWrt 默认 packages 源（在 feeds.conf.default 原始内容中），此处仅追加额外源
+          # ⚠️ 关键：删除所有已有的 packages feed 定义，防止重复
           sed -i '/^src-git packages/d' feeds.conf.default
 
-          # 重新添加 ImmortalWrt 官方 packages（确保唯一且来源明确）
-          echo "src-git packages https://github.com/immortalwrt/packages.git;v25.12.1" >> feeds.conf.default
+          # ✅ 使用 ImmortalWrt 25.12 对应的正确分支名 openwrt-25.12
+          # 注意：packages 仓库没有 v25.12.1 标签，必须用 openwrt-25.12 分支
+          echo "src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12" >> feeds.conf.default
 
-          # small 包 (PassWall2 核心依赖，必须保留)
+          # small 包 (PassWall2 核心依赖)
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
 
-          # kenzok8 插件库 (包含 passwall2、p910nd、eqos 及其他常用插件)
+          # kenzok8 插件库
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
 
           # iStore 应用商店
@@ -141,7 +136,6 @@ jobs:
         run: |
           cd openwrt
 
-          # 加载用户自定义软件包配置
           if [ -f ../.config ]; then
             echo "===== 加载用户自定义配置 ====="
             cp ../.config .config
@@ -150,7 +144,6 @@ jobs:
             exit 1
           fi
 
-          # 确保选中 RAX3000M NAND 设备 (25.12 属于 filogic target)
           cat >> .config <<EOF
           CONFIG_TARGET_mediatek=y
           CONFIG_TARGET_mediatek_filogic=y
@@ -159,10 +152,8 @@ jobs:
 
           make defconfig
 
-          # 配置检查与报告
           echo ""
           echo "========== 配置检查报告 =========="
-          echo ""
           echo "--- 目标设备 ---"
           grep "CONFIG_TARGET.*DEVICE.*=y" .config | head -5
           echo ""
