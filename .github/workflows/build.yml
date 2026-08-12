@@ -89,12 +89,25 @@ jobs:
 
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
-      # ---------- 6. 更新 & 安装 feeds ----------
+       # ---------- 6. 更新 & 安装 feeds ----------
       - name: Update and install feeds
         run: |
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+
+          # ✅ 验证放在所有 feeds 更新/安装完成后
+          echo ""
+          echo "========== Feeds 验证 =========="
+          if ./scripts/feeds list | grep -q "luci-app-passwall2"; then
+            echo "✅ PassWall2 已在 feeds 中找到"
+          else
+            echo "❌ feeds 中未找到 PassWall2"
+            echo "可用的 passwall 相关包："
+            ./scripts/feeds list | grep -i passwall || echo "(无)"
+            exit 1
+          fi
+          echo "=================================="
 
       # ---------- 7. DIY Part 2 - 加载配置后 ----------
       - name: DIY Part2 - After feeds install
