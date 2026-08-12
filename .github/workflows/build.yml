@@ -87,9 +87,6 @@ jobs:
           # iStore 应用商店
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
 
-          # ✅ 新增：PassWall2 专用源 (xrlong 维护，更新及时)
-          echo "src-git passwall2 https://github.com/xiaorouji/openwrt-passwall2.git^main" >> feeds.conf.default
-
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
       # ---------- 6. 更新 & 安装 feeds ----------
