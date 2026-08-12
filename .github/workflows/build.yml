@@ -73,7 +73,7 @@ jobs:
             echo "diy-part1.sh 不存在，跳过"
           fi
 
-            # ---------- 5. 添加第三方 feeds ----------
+      # ---------- 5. 添加第三方 feeds ----------
       - name: Add custom feeds
         run: |
           cd openwrt
@@ -81,7 +81,7 @@ jobs:
           # small 包 (PassWall2 核心依赖，必须保留)
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
 
-          # kenzok8 插件库 (包含 passwall2 及其他常用插件)
+          # kenzok8 插件库 (包含 passwall2、p910nd、eqos 及其他常用插件)
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
 
           # iStore 应用商店
@@ -89,7 +89,8 @@ jobs:
 
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
-       # ---------- 6. 更新 & 安装 feeds ----------
+
+      # ---------- 6. 更新 & 安装 feeds ----------
       - name: Update and install feeds
         run: |
           cd openwrt
@@ -99,12 +100,20 @@ jobs:
           # ✅ 验证放在所有 feeds 更新/安装完成后
           echo ""
           echo "========== Feeds 验证 =========="
-          if ./scripts/feeds list | grep -q "luci-app-passwall2"; then
-            echo "✅ PassWall2 已在 feeds 中找到"
-          else
-            echo "❌ feeds 中未找到 PassWall2"
-            echo "可用的 passwall 相关包："
-            ./scripts/feeds list | grep -i passwall || echo "(无)"
+          FAIL=0
+          for pkg in luci-app-passwall2 luci-app-p910nd luci-app-eqos luci-app-sqm luci-app-wrtbwmon; do
+            if ./scripts/feeds list | grep -q "$pkg"; then
+              echo "✅ $pkg 已在 feeds 中找到"
+            else
+              echo "❌ feeds 中未找到 $pkg"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then
+            echo ""
+            echo "⚠️ 部分插件缺失，请检查 feeds.conf.default 或 diy-part1.sh"
+            echo "可用的打印/限速相关包："
+            ./scripts/feeds list | grep -iE "p910nd|eqos|sqm|wrtbwmon|passwall" || echo "(无)"
             exit 1
           fi
           echo "=================================="
@@ -187,7 +196,7 @@ jobs:
           cd openwrt
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
-          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g' | sed 's/=y//g' | sort | tr '\n' ', ' | sed 's/,$//')
+          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
 
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
