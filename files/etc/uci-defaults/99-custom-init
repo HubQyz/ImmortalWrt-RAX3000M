@@ -2,27 +2,30 @@
 
 # ==========================================
 # RAX3000M 首次启动自定义配置
-# 此脚本仅在首次刷机后执行一次，升级保留配置时不会重复执行
 # ==========================================
 
 # ---------- 1. 设置 LAN 口 IP 为 192.168.6.1 ----------
 uci set network.lan.ipaddr='192.168.6.1'
 uci set network.lan.netmask='255.255.255.0'
 
-# ---------- 2. 设置 2.4G Wi-Fi (名称 + 密码) ----------
+# ---------- 2. 设置默认主题为 KUCAT 酷猫 ----------
+uci set luci.main.mediaurlbase='/luci-static/kucat'
+
+# ---------- 3. 设置 2.4G Wi-Fi (名称 + 密码) ----------
 uci set wireless.default_radio0.ssid='Taurus'
 uci set wireless.default_radio0.disabled='0'
 uci set wireless.default_radio0.encryption='psk2'
 uci set wireless.default_radio0.key='77585211314'
 
-# ---------- 3. 设置 5G Wi-Fi (名称 + 密码) ----------
+# ---------- 4. 设置 5G Wi-Fi (名称 + 密码) ----------
 uci set wireless.default_radio1.ssid='Taurus_5G'
 uci set wireless.default_radio1.disabled='0'
 uci set wireless.default_radio1.encryption='psk2'
 uci set wireless.default_radio1.key='77585211314'
 
-# ---------- 4. 提交更改 ----------
+# ---------- 5. 提交更改 ----------
 uci commit network
 uci commit wireless
+uci commit luci
 
 exit 0
