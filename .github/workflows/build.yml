@@ -84,6 +84,9 @@ jobs:
           # kenzok8 插件库 (包含 passwall2、p910nd、eqos 及其他常用插件)
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
 
+          # OpenWrt 官方 packages (包含 sqm、wrtbwmon 等)
+          echo "src-git packages https://github.com/openwrt/packages.git;openwrt-25.12" >> feeds.conf.default
+          
           # iStore 应用商店
           echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
 
