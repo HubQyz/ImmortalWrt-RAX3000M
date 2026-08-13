@@ -131,26 +131,57 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          
           echo ""
           echo "========== Feeds 验证 =========="
           MISSING=""
+          
+          # 缓存 feeds 列表，避免 Broken pipe
+          ./scripts/feeds list > /tmp/feeds_list.txt 2>/dev/null || true
+          
           for pkg in luci-app-passwall2 luci-app-sqm \
-                     luci-app-ddns-go luci-app-arpbind \
-                     luci-app-quickfile luci-app-ksmbd \
-                     luci-theme-kucat luci-app-kucat-config \
-                     luci-app-netwizard luci-app-partexp \
-                     luci-app-eqosplus luci-app-bandix bandix\
-                     luci-app-wechatpush luci-app-autoreboot; do
-            if ./scripts/feeds list | grep -q "$pkg" || [ -d "package/$pkg" ] || find package/ -maxdepth 2 -type d -name "$pkg" | grep -q .; then
+            luci-app-ddns-go luci-app-arpbind \
+            luci-app-ksmbd \
+            luci-theme-kucat luci-app-kucat-config \
+            luci-app-netwizard luci-app-partexp \
+            luci-app-eqosplus luci-app-bandix bandix \
+            luci-app-wechatpush luci-app-autoreboot; do
+            
+            FOUND=0
+            
+            # 检查1: feeds 列表
+            if grep -q "^$pkg " /tmp/feeds_list.txt 2>/dev/null; then
+              FOUND=1
+            fi
+            
+            # 检查2: package 目录精确匹配
+            if [ -d "package/$pkg" ]; then
+              FOUND=1
+            fi
+            
+            # 检查3: 特殊映射 - bandix 包名对应 openwrt-bandix 目录
+            if [ "$pkg" = "bandix" ] && [ -d "package/openwrt-bandix" ]; then
+              FOUND=1
+            fi
+            
+            # 检查4: 通用子目录查找
+            if find package/ -maxdepth 2 -type d -name "$pkg" 2>/dev/null | grep -q .; then
+              FOUND=1
+            fi
+            
+            if [ "$FOUND" -eq 1 ]; then
               echo "✅ $pkg 已就绪"
             else
-              echo "⚠️ $pkg 未找到（将跳过编译）"
+              echo "⚠️ $pkg 未找到"
               MISSING="$MISSING $pkg"
             fi
           done
+          
+          rm -f /tmp/feeds_list.txt
+          
           if [ -n "$MISSING" ]; then
             echo ""
-            echo "📌 以下包未就绪，已从 .config 中静默忽略："
+            echo "📌 以下包未就绪："
             echo "  $MISSING"
             echo "❌ Feeds validation failed — missing packages: $MISSING"
             exit 1
