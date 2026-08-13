@@ -70,6 +70,43 @@ jobs:
           
           echo "✅ 所有自定义插件克隆完成"
           ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|netspeedtest|eqosplus|bandix|kenzok8"
+
+           # ========== 预检：确认本地克隆包是否存在 ==========
+          echo ""
+          echo "========== 本地克隆包预检 =========="
+          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-netspeedtest luci-app-eqosplus luci-app-bandix"
+          CLONE_MISSING=""
+          for pkg in $CLONE_PKGS; do
+            if [ -d "package/$pkg" ]; then
+              echo "✅ package/$pkg 存在"
+            else
+              echo "❌ package/$pkg 不存在！"
+              CLONE_MISSING="$CLONE_MISSING $pkg"
+            fi
+          done
+          
+          # 单独检查 kenzok8 合集中的 wechatpush
+          if find package/kenzok8-packages -maxdepth 2 -type d -name "luci-app-wechatpush" 2>/dev/null | grep -q .; then
+            echo "✅ package/kenzok8-packages/luci-app-wechatpush 存在"
+          else
+            echo "❌ luci-app-wechatpush 在 kenzok8-packages 中未找到！"
+            CLONE_MISSING="$CLONE_MISSING luci-app-wechatpush"
+          fi
+          
+          if [ -n "$CLONE_MISSING" ]; then
+            echo ""
+            echo "⚠️  以下包克隆失败或路径不匹配："
+            echo "  $CLONE_MISSING"
+            echo ""
+            echo "📂 当前 package/ 目录下实际存在的目录："
+            ls -d package/*/ 2>/dev/null | sed 's|package/||;s|/$||' | sort
+            echo ""
+            echo "💡 请检查 git clone 的目标路径是否与验证列表中的包名一致"
+            echo "❌ 预检失败，终止编译"
+            exit 1
+          fi
+          echo "✅ 所有本地克隆包预检通过"
+          echo "======================================"
           
           if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
