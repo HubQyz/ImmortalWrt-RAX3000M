@@ -52,7 +52,8 @@ jobs:
       - name: DIY Part1 - Before feeds update
         run: |
           cd openwrt
-          # ========== 直接克隆 sirpdboy 插件到 package/ 目录 ==========
+          
+          # ========== 克隆 sirpdboy 插件 ==========
           echo "===== 克隆 sirpdboy 插件 ====="
           git clone --depth=1 https://github.com/sirpdboy/luci-theme-kucat.git package/luci-theme-kucat
           git clone --depth=1 https://github.com/sirpdboy/luci-app-kucat-config.git package/luci-app-kucat-config
@@ -60,8 +61,15 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
           git clone --depth=1 https://github.com/sirpdboy/netspeedtest.git package/luci-app-netspeedtest
-          echo "✅ sirpdboy 插件克隆完成"
-          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|netspeedtest"
+          git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
+          
+          # ========== 克隆其他指定插件 ==========
+          echo "===== 克隆 bandix & wechatpush ====="
+          git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
+          git clone --depth=1 https://github.com/kenzok8/openwrt-packages.git package/kenzok8-packages
+          
+          echo "✅ 所有自定义插件克隆完成"
+          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|netspeedtest|eqosplus|bandix|kenzok8"
           
           if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
@@ -78,7 +86,6 @@ jobs:
           echo "src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main" >> feeds.conf.default
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
-          # Updated feeds: istore, fantastic, sbwml (old URLs were removed/renamed)
           echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
           echo "src-git fantastic https://github.com/fantastic-packages/fantastic-packages-feeds.git" >> feeds.conf.default
           echo "src-git sbwml https://github.com/sbwml/openwrt_helloworld.git" >> feeds.conf.default
@@ -93,188 +100,4 @@ jobs:
           ./scripts/feeds install -a
           echo ""
           echo "========== Feeds 验证 =========="
-          MISSING=""
-          for pkg in luci-app-passwall2 luci-app-sqm luci-app-wrtbwmon \
-                     luci-app-ddns-go luci-app-arpbind \
-                     luci-app-eqosplus luci-app-nft-timecontrol luci-app-bandix luci-app-quickfile \
-                     luci-app-ksmbd \
-                     luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp \
-                     luci-app-taskplan luci-app-netspeedtest; do
-            if ./scripts/feeds list | grep -q "$pkg" || [ -d "package/$pkg" ]; then
-              echo "✅ $pkg 已就绪"
-            else
-              echo "⚠️ $pkg 未找到（将跳过编译）"
-              MISSING="$MISSING $pkg"
-            fi
-          done
-          if [ -n "$MISSING" ]; then
-            echo ""
-            echo "📌 以下包未就绪，已从 .config 中静默忽略："
-            echo "  $MISSING"
-            echo "❌ Feeds validation failed — missing packages: $MISSING"
-            exit 1
-          fi
-          echo "=================================="
-
-      - name: DIY Part2 - After feeds install
-        run: |
-          [ -d files ] && mv files openwrt/files || true
-          if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
-            chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
-            cd openwrt
-            "$GITHUB_WORKSPACE/diy-part2.sh"
-          else
-            echo "diy-part2.sh 不存在，跳过"
-          fi
-
-      - name: Load device config
-        run: |
-          cd openwrt
-          if [ -f ../.config ]; then
-            echo "===== 加载用户自定义配置 ====="
-            cp ../.config .config
-          else
-            echo "⚠️ 未找到用户自定义 .config"
-            exit 1
-          fi
-          cat >> .config <<EOF
-          CONFIG_TARGET_mediatek=y
-          CONFIG_TARGET_mediatek_filogic=y
-          CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
-          EOF
-          make defconfig
-
-      - name: Deep Clean Build Cache (Critical for Size Optimization)
-        run: |
-          cd openwrt
-          echo "===== 开始深度清理 ====="
-          
-          # 1. 清理编译中间文件 (必须)
-          make clean
-          
-          # 2. 强制删除构建目录和二进制输出 (防止旧包残留)
-          rm -rf bin/ build_dir/ tmp/
-          
-          # 3. 清理 ccache 缓存 (防止旧的二进制文件被复用)
-          # 注意：这会稍微增加本次编译时间，但能确保固件纯净
-          ccache -C || true
-          rm -rf .ccache/ ~/.ccache/
-          
-          # 4. 可选：清理下载缓存 (如果不想重新下载所有源码，可注释掉 dl/)
-          # rm -rf dl/ 
-          
-          echo "✅ 清理完成，当前磁盘使用："
-          df -h .
-          echo "========================="
-          
-          echo ""
-          echo "========== 配置检查报告 =========="
-          echo "--- 目标设备 ---"
-          grep "CONFIG_TARGET.*DEVICE.*=y" .config | head -5
-          echo ""
-          echo "--- 被丢弃的包 (用户要求但未编入) ---"
-          comm -23 \
-            <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
-            <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
-            || echo "(无丢弃)"
-          echo ""
-          echo "--- 最终编入的 luci-app 插件 ---"
-          grep "^CONFIG_PACKAGE_luci-app-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo ""
-          echo "--- 最终编入的主题 ---"
-          grep "^CONFIG_PACKAGE_luci-theme-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo ""
-          echo "--- 最终编入的其他包 ---"
-          grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-\|luci-theme-\|luci-lib-\|kmod-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo "=================================="
-
-      - name: Download package sources
-        run: |
-          cd openwrt
-          make download -j$(nproc)
-          find dl -size -1024c -exec ls -l {} \;
-          find dl -size -1024c -exec rm -f {} \;
-
-      - name: Compile firmware
-        run: |
-          cd openwrt
-          make -j$(nproc) || make -j1 V=s
-          echo "===== 编译完成 ====="
-          find bin/targets/ -type f \( -name "*.bin" -o -name "*.itb" \) | head -20
-
-      - name: Generate Release Notes
-        id: notes
-        run: |
-          cd openwrt
-          KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
-          SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
-          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
-          THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
-          cat > release_notes.txt <<EOF
-          ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
-          **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
-          **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
-          **Linux 内核**: $KERNEL_VER
-          **目标设备**: CMCC RAX3000M (MT7981 / NAND 128M)
-          **目标平台**: mediatek/filogic
-          **无线驱动**: mt76 开源驱动
-          **固件格式**: .itb (FIT image)
-          **包管理器**: apk (Alpine Package Keeper)
-          ---
-          ### ⚠️ 刷机须知
-          1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
-          2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
-          3. **升级固件**: 使用 sysupgrade.itb，建议不保留配置升级
-          4. **默认地址**: 192.168.6.1
-          5. **默认密码**: 无 (留空)
-          6. **Wi-Fi**: Taurus / Taurus_5G (密码: 77585211314)
-          7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
-          ---
-          ### 内置主题
-          $THEMES
-          ---
-          ### 内置插件清单
-          $PLUGINS
-          ---
-          ### 特性说明
-          - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
-          - ✅ KUCAT 酷猫主题，移动端优化
-          - ✅ mt76 开源无线驱动，社区维护
-          - ✅ IPv6 支持完善，无已知严重 bug
-          - ✅ 软件包管理器: apk (Alpine Package Keeper)
-          - ✅ 内核 6.12 LTS，长期支持
-          EOF
-          echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
-
-      - name: Organize firmware files
-        id: organize
-        run: |
-          cd openwrt/bin/targets/*/*
-          rm -rf packages
-          echo "===== 固件文件列表 ====="
-          ls -lh *.itb 2>/dev/null || true
-          ls -lh *.bin 2>/dev/null || true
-          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-          echo "status=success" >> $GITHUB_OUTPUT
-
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@v7
-        if: steps.organize.outputs.status == 'success'
-        with:
-          name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
-          path: |
-            ${{ env.FIRMWARE }}/*.itb
-            ${{ env.FIRMWARE }}/*.bin
-
-      - name: Release to GitHub
-        uses: softprops/action-gh-release@v3
-        if: steps.organize.outputs.status == 'success' && inputs.release == true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
-          name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-Build-${{ github.run_number }}
-          body_path: openwrt/release_notes.txt
-          files: |
-            ${{ env.FIRMWARE }}/*.itb
-            ${{ env.FIRMWARE }}/*.bin
+         
