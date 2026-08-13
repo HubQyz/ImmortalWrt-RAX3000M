@@ -118,7 +118,7 @@ jobs:
           # ✅ 添加 DDNSTO 官方双源 (根据 README 截图)
           # 注意：nas 用 master 分支，nas_luci 用 main 分支
           echo "src-git nas https://github.com/linkease/nas-packages.git;master" >> feeds.conf.default
-          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main" >> feeds.co
+          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main" >> feeds.conf.default
           
           # 保留其他必要源
           echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
@@ -150,7 +150,8 @@ jobs:
             luci-app-netwizard luci-app-partexp \
             luci-app-eqosplus luci-app-bandix bandix \
             luci-app-wechatpush luci-app-autoreboot \
-            luci-app-lucky"
+            luci-app-lucky \
+            luci-app-ddnsto ddnsto"  
             
           # 2. 可选包列表 (缺失仅警告，继续编译)
           OPTIONAL_PKGS="rclone luci-app-rclone"
