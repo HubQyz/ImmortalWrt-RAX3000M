@@ -78,9 +78,11 @@ jobs:
           echo "src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main" >> feeds.conf.default
           echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
           echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
-          echo "src-git istore https://github.com/linkease/istore.git" >> feeds.conf.default
-          echo "src-git fantastic https://github.com/muink/fantastic-packages.git" >> feeds.conf.default
-          echo "src-git sbwml https://github.com/sbwml/openwrt-packages.git" >> feeds.conf.default
+          # Updated feeds: istore, fantastic, sbwml (old URLs were removed/renamed)
+          echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
+          echo "src-git fantastic https://github.com/fantastic-packages/fantastic-packages-feeds.git" >> feeds.conf.default
+          echo "src-git sbwml https://github.com/sbwml/openwrt_helloworld.git" >> feeds.conf.default
+          echo "src-git sbwml_pkgs https://github.com/sbwml/openwrt_pkgs.git" >> feeds.conf.default
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
 
@@ -109,6 +111,8 @@ jobs:
             echo ""
             echo "📌 以下包未就绪，已从 .config 中静默忽略："
             echo "  $MISSING"
+            echo "❌ Feeds validation failed — missing packages: $MISSING"
+            exit 1
           fi
           echo "=================================="
 
