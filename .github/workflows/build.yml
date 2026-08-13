@@ -60,7 +60,6 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-netwizard.git package/luci-app-netwizard
           git clone --depth=1 https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
-          git clone --depth=1 https://github.com/sirpdboy/netspeedtest.git package/luci-app-netspeedtest
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
           
                     # ========== 克隆 bandix（核心后端 + LuCI 前端） ==========
@@ -69,12 +68,12 @@ jobs:
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
           
           echo "✅ 所有自定义插件克隆完成"
-          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|netspeedtest|eqosplus|bandix"
+          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|eqosplus|bandix"
           
           # ========== 预检：确认本地克隆包是否存在 ==========
           echo ""
           echo "========== 本地克隆包预检 =========="
-          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-netspeedtest luci-app-eqosplus openwrt-bandix luci-app-bandix"
+          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus openwrt-bandix luci-app-bandix"
           CLONE_MISSING=""
           for pkg in $CLONE_PKGS; do
             if [ -d "package/$pkg" ]; then
@@ -135,7 +134,6 @@ jobs:
                      luci-app-quickfile luci-app-ksmbd \
                      luci-theme-kucat luci-app-kucat-config \
                      luci-app-netwizard luci-app-partexp \
-                     luci-app-taskplan luci-app-netspeedtest \
                      luci-app-eqosplus luci-app-bandix bandix\
                      luci-app-wechatpush; do
             if ./scripts/feeds list | grep -q "$pkg" || [ -d "package/$pkg" ] || find package/ -maxdepth 2 -type d -name "$pkg" | grep -q .; then
