@@ -136,60 +136,76 @@ jobs:
           
           echo ""
           echo "========== Feeds 验证 =========="
-          MISSING=""
           
-          # 缓存 feeds 列表，避免 Broken pipe
-          ./scripts/feeds list > /tmp/feeds_list.txt 2>/dev/null || true
-          
-          for pkg in luci-app-passwall2 luci-app-sqm \
+          # 1. 必装包列表 (缺失则终止编译)
+          REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm \
             luci-app-ddns-go luci-app-arpbind \
             luci-app-ksmbd \
             luci-theme-kucat luci-app-kucat-config \
             luci-app-netwizard luci-app-partexp \
             luci-app-eqosplus luci-app-bandix bandix \
             luci-app-wechatpush luci-app-autoreboot \
-            rclone luci-app-rclone \
-            luci-app-lucky; do   # <--- 添加在这里
+            luci-app-lucky"
             
-            FOUND=0
+          # 2. 可选包列表 (缺失仅警告，继续编译)
+          OPTIONAL_PKGS="rclone luci-app-rclone"
+          
+          MISSING_REQUIRED=""
+          MISSING_OPTIONAL=""
+          
+          # 缓存 feeds 列表避免 Broken pipe
+          ./scripts/feeds list > /tmp/feeds_list.txt 2>/dev/null || true
+          
+          check_pkg() {
+            local pkg=$1
+            local is_required=$2
+            local found=0
             
-            # 检查1: feeds 列表
-            if grep -q "^$pkg " /tmp/feeds_list.txt 2>/dev/null; then
-              FOUND=1
-            fi
+            if grep -q "^$pkg " /tmp/feeds_list.txt 2>/dev/null; then found=1; fi
+            if [ -d "package/$pkg" ]; then found=1; fi
+            if [ "$pkg" = "bandix" ] && [ -d "package/openwrt-bandix" ]; then found=1; fi
+            if find package/ -maxdepth 2 -type d -name "$pkg" 2>/dev/null | grep -q .; then found=1; fi
             
-            # 检查2: package 目录精确匹配
-            if [ -d "package/$pkg" ]; then
-              FOUND=1
-            fi
-            
-            # 检查3: 特殊映射 - bandix 包名对应 openwrt-bandix 目录
-            if [ "$pkg" = "bandix" ] && [ -d "package/openwrt-bandix" ]; then
-              FOUND=1
-            fi
-            
-            # 检查4: 通用子目录查找
-            if find package/ -maxdepth 2 -type d -name "$pkg" 2>/dev/null | grep -q .; then
-              FOUND=1
-            fi
-            
-            if [ "$FOUND" -eq 1 ]; then
+            if [ "$found" -eq 1 ]; then
               echo "✅ $pkg 已就绪"
             else
-              echo "⚠️ $pkg 未找到"
-              MISSING="$MISSING $pkg"
+              if [ "$is_required" = "true" ]; then
+                echo "❌ $pkg 未找到 (必装)"
+                MISSING_REQUIRED="$MISSING_REQUIRED $pkg"
+              else
+                echo "⚠️ $pkg 未找到 (可选，将跳过)"
+                MISSING_OPTIONAL="$MISSING_OPTIONAL $pkg"
+              fi
             fi
+          }
+          
+          # 检查必装包
+          for pkg in $REQUIRED_PKGS; do
+            check_pkg "$pkg" "true"
+          done
+          
+          # 检查可选包
+          for pkg in $OPTIONAL_PKGS; do
+            check_pkg "$pkg" "false"
           done
           
           rm -f /tmp/feeds_list.txt
           
-          if [ -n "$MISSING" ]; then
+          # 仅当必装包缺失时才终止
+          if [ -n "$MISSING_REQUIRED" ]; then
             echo ""
-            echo "📌 以下包未就绪："
-            echo "  $MISSING"
-            echo "❌ Feeds validation failed — missing packages: $MISSING"
+            echo "📌 以下必装包未就绪："
+            echo "  $MISSING_REQUIRED"
+            echo "❌ Feeds validation failed — missing required packages."
             exit 1
           fi
+          
+          if [ -n "$MISSING_OPTIONAL" ]; then
+            echo ""
+            echo "📌 以下可选包未就绪 (已从 .config 中静默忽略，不影响编译)："
+            echo "  $MISSING_OPTIONAL"
+          fi
+          
           echo "✅ 所有必需包验证通过"
           echo "=================================="
 
