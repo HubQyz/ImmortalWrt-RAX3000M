@@ -212,6 +212,12 @@ jobs:
       - name: DIY Part2 - After feeds install
         run: |
           [ -d files ] && mv files openwrt/files || true
+          # ✅ 添加这一行，确保脚本有执行权限
+          if [ -f "openwrt/files/etc/uci-defaults/99-custom-init" ]; then
+            chmod +x openwrt/files/etc/uci-defaults/99-custom-init
+            echo "✅ 已赋予 99-custom-init 执行权限"
+          fi
+          
           if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
             cd openwrt
