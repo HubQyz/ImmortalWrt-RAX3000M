@@ -109,16 +109,26 @@ jobs:
       - name: Add custom feeds
         run: |
           cd openwrt
+          
+          # 1. 清理默认 packages 源（避免版本冲突，ImmortalWrt 25.12 需要指定分支）
           sed -i '/^src-git packages/d' feeds.conf.default
           echo "src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12" >> feeds.conf.default
-          echo "src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main" >> feeds.conf.default
-          echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
+          
+          # 2. ✅ 仅添加 Passwall2 官方纯净源（包含 luci-app-passwall2 + xray/sing-box/hysteria 等核心）
+          echo "src-git passwall https://github.com/xiaorouji/openwrt-passwall-packages.git;main" >> feeds.conf.default
+          echo "src-git lualib https://github.com/xiaorouji/openwrt-passwall.git;main" >> feeds.conf.default
+          
+          # 3. 保留你需要的其他非代理类源
           echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
           echo "src-git fantastic https://github.com/fantastic-packages/fantastic-packages-feeds.git" >> feeds.conf.default
-          echo "src-git sbwml https://github.com/sbwml/openwrt_helloworld.git" >> feeds.conf.default
-          echo "src-git sbwml_pkgs https://github.com/sbwml/openwrt_pkgs.git" >> feeds.conf.default
-          echo "===== Feeds 配置 ====="
+          
+          # ❌ 已移除以下“全家桶”源：
+          # - kenzok8/small (包含 SSR+, Clash, MosDNS, Nikki 等几十个代理)
+          # - kenzok8/openwrt-packages (kenzok8 的个人聚合包)
+          # - sbwml/openwrt_helloworld (另一个大型代理聚合源)
+          # - sbwml/openwrt_pkgs
+          
+          echo "===== 最终 Feeds 配置 ====="
           cat feeds.conf.default
 
       - name: Update and install feeds
