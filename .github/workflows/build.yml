@@ -62,7 +62,7 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
           
-                    # ========== 克隆 bandix（核心后端 + LuCI 前端） ==========
+          # ========== 克隆 bandix（核心后端 + LuCI 前端） ==========
           echo "===== 克隆 bandix ====="
           git clone --depth=1 https://github.com/timsaya/openwrt-bandix.git package/openwrt-bandix
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
