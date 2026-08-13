@@ -114,6 +114,11 @@ jobs:
           
           # ✅ 添加 Lucky 独立源 (sirpdboy 维护)
           echo "src-git lucky https://github.com/sirpdboy/luci-app-lucky.git;main" >> feeds.conf.default
+
+          # ✅ 添加 DDNSTO 官方双源 (根据 README 截图)
+          # 注意：nas 用 master 分支，nas_luci 用 main 分支
+          echo "src-git nas https://github.com/linkease/nas-packages.git;master" >> feeds.conf.default
+          echo "src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main" >> feeds.co
           
           # 保留其他必要源
           echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
