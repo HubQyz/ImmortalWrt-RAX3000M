@@ -82,7 +82,6 @@ jobs:
           # ========== 预检：确认本地克隆包是否存在 ==========
           echo ""
           echo "========== 本地克隆包预检 =========="
-          # 【修改】加入了 luci-app-mosdns
           CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus openwrt-bandix luci-app-bandix luci-app-mosdns"
           CLONE_MISSING=""
           for pkg in $CLONE_PKGS; do
@@ -141,9 +140,9 @@ jobs:
           echo ""
           echo "========== Feeds 验证 =========="
           # 1. 必装包列表 (缺失则终止编译)
-          # 【修改】加入了 mosdns 相关包
+          # 【修改】移除了 luci-app-ddns-go，加入了 mosdns 相关包
           REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm \
-            luci-app-ddns-go luci-app-arpbind \
+            luci-app-arpbind \
             luci-app-ksmbd \
             luci-theme-kucat luci-app-kucat-config \
             luci-app-netwizard luci-app-partexp \
