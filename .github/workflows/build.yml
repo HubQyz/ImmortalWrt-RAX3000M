@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Init build environment
         env:
@@ -293,7 +293,7 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: Upload firmware artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success'
         with:
           name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
@@ -302,7 +302,7 @@ jobs:
             ${{ env.FIRMWARE }}/*.bin
 
       - name: Release to GitHub
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         if: steps.organize.outputs.status == 'success' && inputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
