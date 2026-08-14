@@ -350,6 +350,7 @@ jobs:
           5. **默认密码**: 无 (留空)
           6. **Wi-Fi**: Taurus / Taurus_5G (密码: 77585211314)
           7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
+          8. **U-Boot 文件**: 附件中的 \`bl2.img\` 和 \`fip.bin\` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd）
           ---
           ### 内置主题
           $THEMES
@@ -387,7 +388,6 @@ jobs:
           path: |
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
-
       - name: Release to GitHub
         uses: softprops/action-gh-release@v3
         if: steps.organize.outputs.status == 'success' && inputs.release == 'true'
@@ -400,3 +400,5 @@ jobs:
           files: |
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
+            uboot-yuzhii/bl2.img
+            uboot-yuzhii/fip.bin
