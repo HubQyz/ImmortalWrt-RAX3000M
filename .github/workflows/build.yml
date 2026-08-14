@@ -260,7 +260,7 @@ jobs:
           3. **升级固件**: 使用 sysupgrade.itb，建议不保留配置升级
           4. **默认地址**: 192.168.6.1
           5. **默认密码**: 无 (留空)
-          6. **Wi-Fi**: Taurus / Taurus_5G (密码: 77585211314)
+          6. **Wi-Fi**: 自行查看
           7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
           8. **U-Boot 文件**: 附件中的 \`bl2.img\` 和 \`fip.bin\` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd)
           ---
