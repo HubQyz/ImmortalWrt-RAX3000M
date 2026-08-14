@@ -62,7 +62,7 @@ jobs:
           git clone -b v5 --depth=1 https://github.com/sbwml/luci-app-mosdns.git package/luci-app-mosdns
           echo "✅ MosDNS 克隆完成"
           
-          # ========== 克隆 sirpdboy 插件 ==========
+          # ========== 克隆 sirpdboy 插件 (包含 Lucky) ==========
           echo "===== 克隆 sirpdboy 插件 ====="
           git clone --depth=1 https://github.com/sirpdboy/luci-theme-kucat.git package/luci-theme-kucat
           git clone --depth=1 https://github.com/sirpdboy/luci-app-kucat-config.git package/luci-app-kucat-config
@@ -70,6 +70,8 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
+          # 【新增】克隆 Lucky (大吉) - 改为 git clone 方式
+          git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git package/luci-app-lucky
           
           # ========== 克隆 bandix（核心后端 + LuCI 前端） ==========
           echo "===== 克隆 bandix ====="
@@ -77,12 +79,13 @@ jobs:
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
           
           echo "✅ 所有自定义插件克隆完成"
-          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|eqosplus|bandix|mosdns"
+          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|eqosplus|bandix|lucky|mosdns"
 
           # ========== 预检：确认本地克隆包是否存在 ==========
           echo ""
           echo "========== 本地克隆包预检 =========="
-          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus openwrt-bandix luci-app-bandix luci-app-mosdns"
+          # 【修改】CLONE_PKGS 加入 luci-app-lucky 和 luci-app-mosdns
+          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus luci-app-lucky openwrt-bandix luci-app-bandix luci-app-mosdns"
           CLONE_MISSING=""
           for pkg in $CLONE_PKGS; do
             if [ -d "package/$pkg" ]; then
@@ -107,6 +110,7 @@ jobs:
           echo "✅ 所有本地克隆包预检通过"
           echo "======================================"
 
+          # 【补全】执行用户自定义的 diy-part1.sh (如果存在)
           if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
             "$GITHUB_WORKSPACE/diy-part1.sh"
