@@ -197,6 +197,7 @@ jobs:
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           
           # 获取关键插件版本号函数
+          # ── 通用函数（passwall2、kucat 直接用这个就够）──────────────────
           get_pkg_ver() {
             local pkg=$1
             local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
@@ -212,52 +213,70 @@ jobs:
             echo "${ver:-Unknown}"
           }
 
-          # MosDNS 本体版本（mosdns/Makefile，非 luci-app-mosdns）
+          # ── MosDNS 本体（mosdns/Makefile，排除 luci-app-mosdns）──────────
           get_mosdns_core_ver() {
-            local ver=$(grep -A 2 "Package: mosdns$" tmp/info/.files-packageinfo 2>/dev/null \
-                        | grep "Version:" | awk '{print $2}' | head -1)
-            if [ -z "$ver" ]; then
-              local mk=$(find package/ feeds/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
-                         | grep -v "luci-app-mosdns" | head -1)
-              if [ -n "$mk" ]; then
-                ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-                local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-                [ -n "$rel" ] && ver="$ver-$rel"
-              fi
+            local ver=""
+            if command -v apk >/dev/null 2>&1; then
+              ver=$(apk list -I 2>/dev/null | grep "^mosdns-[0-9]" | head -1 \
+                    | awk '{print $1}' | sed 's/^mosdns-//')
+              [ -n "$ver" ] && { echo "$ver"; return; }
+            fi
+            local mk=$(find feeds/ package/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
+                       | grep -v "luci-app-mosdns" | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
             fi
             echo "${ver:-Unknown}"
           }
 
-          # ksmbd 三级回退查找（来自官方 feeds，路径不确定）
+          # ── SmartDNS 本体（smartdns 包，非 luci-app-smartdns）────────────
+          get_smartdns_core_ver() {
+            local ver=""
+            if command -v apk >/dev/null 2>&1; then
+              ver=$(apk list -I 2>/dev/null | grep "^smartdns-[0-9]" | head -1 \
+                    | awk '{print $1}' | sed 's/^smartdns-//')
+              [ -n "$ver" ] && { echo "$ver"; return; }
+            fi
+            local mk=$(find feeds/ package/ -type f -path "*/smartdns/Makefile" 2>/dev/null \
+                       | grep -v "luci-app-smartdns" | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
+            fi
+            echo "${ver:-Unknown}"
+          }
+
+          # ── ksmbd（官方 feeds，三级回退）────────────────────────────────
           get_ksmbd_ver() {
             local ver=""
-            # 1. 编译产物索引
+            if command -v apk >/dev/null 2>&1; then
+              ver=$(apk list -I 2>/dev/null | grep "^luci-app-ksmbd-[0-9]" | head -1 \
+                    | awk '{print $1}' | sed 's/^luci-app-ksmbd-//')
+              [ -n "$ver" ] && { echo "$ver"; return; }
+            fi
             ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
                   | grep "Version:" | awk '{print $2}' | head -1)
             [ -n "$ver" ] && { echo "$ver"; return; }
-            # 2. feeds Makefile
             local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
             if [ -n "$mk" ]; then
               ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
               local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              [ -n "$rel" ] && ver="$ver-$rel"
-              [ -n "$ver" ] && { echo "$ver"; return; }
+              [ -n "$rel" ] && ver="${ver}-${rel}"
             fi
-            # 3. ipk 文件名
-            local ipk=$(find bin/packages/ -name "luci-app-ksmbd_*.ipk" 2>/dev/null | head -1)
-            if [ -n "$ipk" ]; then
-              ver=$(echo "$ipk" | sed -n 's/.*luci-app-ksmbd_\([^_]*\)_all\.ipk/\1/p')
-              [ -n "$ver" ] && { echo "$ver"; return; }
-            fi
-            echo "Unknown"
+            echo "${ver:-Unknown}"
           }
 
-          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
-          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")    # LuCI前端 如 1.7.4-1
-          VER_MOSDNS_CORE=$(get_mosdns_core_ver)               # 本体     如 5.3.4-6
-          VER_SMARTDNS=$(get_pkg_ver "luci-app-smartdns")
-          VER_KSMBD=$(get_ksmbd_ver)                           # 三级回退
-          VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
+          # ── 赋值 ────────────────────────────────────────────────────────
+          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")       # 默认函数 ✅ 不用改
+          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")        # 默认函数 ✅
+          VER_MOSDNS_CORE=$(get_mosdns_core_ver)                  # 专用函数 🆕
+          VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")    # 默认函数 ✅
+          VER_SMARTDNS_CORE=$(get_smartdns_core_ver)              # 专用函数 🆕
+          VER_KSMBD=$(get_ksmbd_ver)                              # 专用函数 🆕
+          VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")             # 默认函数 ✅ 不用改
           
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
