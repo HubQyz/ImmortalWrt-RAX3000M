@@ -121,8 +121,6 @@ jobs:
           sed -i '/^src-git packages/d' feeds.conf.default
           echo "src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main" >> feeds.conf.default
-          # ✅ 添加 Lucky 独立源 (sirpdboy 维护)
-          echo "src-git lucky https://github.com/sirpdboy/luci-app-lucky.git;main" >> feeds.conf.default
           # ✅ 添加 DDNSTO 官方双源
           echo "src-git nas https://github.com/linkease/nas-packages.git;master" >> feeds.conf.default
           echo "src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main" >> feeds.conf.default
