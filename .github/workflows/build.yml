@@ -53,6 +53,15 @@ jobs:
         run: |
           cd openwrt
           
+          # ========== 【新增】克隆 MosDNS (sbwml) ==========
+          echo "===== 克隆 MosDNS (sbwml) ====="
+          # 删除源码自带的旧版 mosdns (防止冲突)
+          rm -rf ./feeds/packages/net/mosdns
+          rm -rf ./package/feeds/packages/mosdns
+          # 克隆 v5 分支 (适配 OpenWrt 23.05/24.10/25.12)
+          git clone -b v5 --depth=1 https://github.com/sbwml/luci-app-mosdns.git package/luci-app-mosdns
+          echo "✅ MosDNS 克隆完成"
+          
           # ========== 克隆 sirpdboy 插件 ==========
           echo "===== 克隆 sirpdboy 插件 ====="
           git clone --depth=1 https://github.com/sirpdboy/luci-theme-kucat.git package/luci-theme-kucat
@@ -68,12 +77,13 @@ jobs:
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
           
           echo "✅ 所有自定义插件克隆完成"
-          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|eqosplus|bandix"
-          
+          ls -la package/ | grep -E "kucat|netwizard|partexp|taskplan|eqosplus|bandix|mosdns"
+
           # ========== 预检：确认本地克隆包是否存在 ==========
           echo ""
           echo "========== 本地克隆包预检 =========="
-          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus openwrt-bandix luci-app-bandix"
+          # 【修改】加入了 luci-app-mosdns
+          CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus openwrt-bandix luci-app-bandix luci-app-mosdns"
           CLONE_MISSING=""
           for pkg in $CLONE_PKGS; do
             if [ -d "package/$pkg" ]; then
@@ -83,7 +93,6 @@ jobs:
               CLONE_MISSING="$CLONE_MISSING $pkg"
             fi
           done
-          
           if [ -n "$CLONE_MISSING" ]; then
             echo ""
             echo "⚠️  以下包克隆失败或路径不匹配："
@@ -98,37 +107,28 @@ jobs:
           fi
           echo "✅ 所有本地克隆包预检通过"
           echo "======================================"
-          
+
           if [ -f "$GITHUB_WORKSPACE/diy-part1.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
             "$GITHUB_WORKSPACE/diy-part1.sh"
           else
             echo "diy-part1.sh 不存在，跳过"
           fi
+
       - name: Add custom feeds
         run: |
           cd openwrt
           sed -i '/^src-git packages/d' feeds.conf.default
           echo "src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12" >> feeds.conf.default
           echo "src-git passwall https://github.com/Openwrt-Passwall/openwrt-passwall2.git;main" >> feeds.conf.default
-          
           # ✅ 添加 Lucky 独立源 (sirpdboy 维护)
           echo "src-git lucky https://github.com/sirpdboy/luci-app-lucky.git;main" >> feeds.conf.default
-
-          # ✅ 添加 DDNSTO 官方双源 (根据 README 截图)
-          # 注意：nas 用 master 分支，nas_luci 用 main 分支
+          # ✅ 添加 DDNSTO 官方双源
           echo "src-git nas https://github.com/linkease/nas-packages.git;master" >> feeds.conf.default
           echo "src-git nas_luci https://github.com/linkease/nas-packages-luci.git;main" >> feeds.conf.default
-          
           # 保留其他必要源
           echo "src-git istore https://github.com/linkease/istore.git;main" >> feeds.conf.default
           echo "src-git fantastic https://github.com/fantastic-packages/fantastic-packages-feeds.git" >> feeds.conf.default
-          
-          # ❌ 建议移除以下全家桶源（如果你已确认不需要其中的其他插件）
-          # echo "src-git small https://github.com/kenzok8/small.git" >> feeds.conf.default
-          # echo "src-git kenzok8 https://github.com/kenzok8/openwrt-packages.git" >> feeds.conf.default
-          # echo "src-git sbwml https://github.com/sbwml/openwrt_helloworld.git" >> feeds.conf.default
-          # echo "src-git sbwml_pkgs https://github.com/sbwml/openwrt_pkgs.git" >> feeds.conf.default
           
           echo "===== Feeds 配置 ====="
           cat feeds.conf.default
@@ -138,11 +138,10 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          
           echo ""
           echo "========== Feeds 验证 =========="
-          
           # 1. 必装包列表 (缺失则终止编译)
+          # 【修改】加入了 mosdns 相关包
           REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm \
             luci-app-ddns-go luci-app-arpbind \
             luci-app-ksmbd \
@@ -151,25 +150,28 @@ jobs:
             luci-app-eqosplus luci-app-bandix bandix \
             luci-app-wechatpush luci-app-autoreboot \
             luci-app-lucky \
-            luci-app-ddnsto ddnsto"  
+            luci-app-ddnsto ddnsto \
+            luci-app-mosdns mosdns v2dat"
             
           # 2. 可选包列表 (缺失仅警告，继续编译)
-          OPTIONAL_PKGS="rclone luci-app-rclone"
+          # 【修改】移除了 rclone
+          OPTIONAL_PKGS=""
           
           MISSING_REQUIRED=""
           MISSING_OPTIONAL=""
-          
           # 缓存 feeds 列表避免 Broken pipe
           ./scripts/feeds list > /tmp/feeds_list.txt 2>/dev/null || true
-          
           check_pkg() {
             local pkg=$1
             local is_required=$2
             local found=0
-            
             if grep -q "^$pkg " /tmp/feeds_list.txt 2>/dev/null; then found=1; fi
             if [ -d "package/$pkg" ]; then found=1; fi
             if [ "$pkg" = "bandix" ] && [ -d "package/openwrt-bandix" ]; then found=1; fi
+            # 特殊处理 mosdns 目录结构
+            if [ "$pkg" = "mosdns" ] || [ "$pkg" = "v2dat" ]; then
+               if [ -d "package/luci-app-mosdns" ]; then found=1; fi
+            fi
             if find package/ -maxdepth 2 -type d -name "$pkg" 2>/dev/null | grep -q .; then found=1; fi
             
             if [ "$found" -eq 1 ]; then
@@ -184,19 +186,15 @@ jobs:
               fi
             fi
           }
-          
           # 检查必装包
           for pkg in $REQUIRED_PKGS; do
             check_pkg "$pkg" "true"
           done
-          
           # 检查可选包
           for pkg in $OPTIONAL_PKGS; do
             check_pkg "$pkg" "false"
           done
-          
           rm -f /tmp/feeds_list.txt
-          
           # 仅当必装包缺失时才终止
           if [ -n "$MISSING_REQUIRED" ]; then
             echo ""
@@ -205,13 +203,11 @@ jobs:
             echo "❌ Feeds validation failed — missing required packages."
             exit 1
           fi
-          
           if [ -n "$MISSING_OPTIONAL" ]; then
             echo ""
             echo "📌 以下可选包未就绪 (已从 .config 中静默忽略，不影响编译)："
             echo "  $MISSING_OPTIONAL"
           fi
-          
           echo "✅ 所有必需包验证通过"
           echo "=================================="
 
@@ -223,7 +219,6 @@ jobs:
             chmod +x openwrt/files/etc/uci-defaults/99-custom-init
             echo "✅ 已赋予 99-custom-init 执行权限"
           fi
-          
           if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
             cd openwrt
@@ -302,7 +297,30 @@ jobs:
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
-          THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
+          THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
+          
+          # 【新增】获取关键插件版本号
+          get_pkg_ver() {
+            local pkg=$1
+            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null | grep "Version:" | awk '{print $2}' | head -1)
+            if [ -z "$ver" ]; then
+               # 尝试从 Makefile 获取 (针对本地 clone 的包)
+               local mk=$(find package/ feeds/ -name "Makefile" -path "*/$pkg/*" 2>/dev/null | head -1)
+               if [ -n "$mk" ]; then
+                 ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+                 local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+                 [ -n "$rel" ] && ver="$ver-$rel"
+               fi
+            fi
+            echo "${ver:-Unknown}"
+          }
+          
+          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
+          VER_MOSDNS=$(get_pkg_ver "luci-app-mosdns")
+          VER_SMARTDNS=$(get_pkg_ver "luci-app-smartdns")
+          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
+          VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
+
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
@@ -313,6 +331,13 @@ jobs:
           **无线驱动**: mt76 开源驱动
           **固件格式**: .itb (FIT image)
           **包管理器**: apk (Alpine Package Keeper)
+          ---
+          ### 📦 核心插件版本
+          - **Passwall2**: $VER_PASSWALL2
+          - **MosDNS**: $VER_MOSDNS
+          - **SmartDNS**: $VER_SMARTDNS
+          - **Ksmbd**: $VER_KSMBD
+          - **Kucat Theme**: $VER_KUCAT
           ---
           ### ⚠️ 刷机须知
           1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
@@ -336,6 +361,7 @@ jobs:
           - ✅ IPv6 支持完善，无已知严重 bug
           - ✅ 软件包管理器: apk (Alpine Package Keeper)
           - ✅ 内核 6.12 LTS，长期支持
+          - ✅ 集成 MosDNS v5 (sbwml) 与 SmartDNS 双重 DNS 优化
           EOF
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
@@ -361,7 +387,7 @@ jobs:
 
       - name: Release to GitHub
         uses: softprops/action-gh-release@v3
-        if: steps.organize.outputs.status == 'success' && inputs.release == true
+        if: steps.organize.outputs.status == 'success' && inputs.release == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
