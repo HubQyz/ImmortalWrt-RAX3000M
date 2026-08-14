@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: '发布到 Release (建议始终勾选)'
-        required: true
+        description: '发布到 Release (建议始终勾选，现已改为自动发布)'
+        required: false
         default: true
         type: boolean
 
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: 检出代码 (Checkout)
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: 初始化编译环境 (Init Environment)
         env:
@@ -108,15 +108,16 @@ jobs:
           # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
           REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
+          
           for pkg in $REQUIRED_PKGS; do
             if [ -d "package/$pkg" ] || [ -d "package/openwrt-passwall2/$pkg" ] || [ -d "package/nas-packages/$pkg" ] || [ -d "package/nas-packages-luci/$pkg" ] || [ -d "package/istore/$pkg" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
-               echo "✅ $pkg 已就绪"
+              echo "✅ $pkg 已就绪"
             else
-               if ./scripts/feeds list | grep -q "^$pkg "; then
-                  echo "✅ $pkg 在 Feeds 中找到"
-               else
-                  echo "❌ $pkg 未找到"
-               fi
+              if ./scripts/feeds list | grep -q "^$pkg "; then
+                echo "✅ $pkg 在 Feeds 中找到"
+              else
+                echo "❌ $pkg 未找到"
+              fi
             fi
           done
           echo "✅ 所有必需包验证通过"
@@ -193,15 +194,15 @@ jobs:
           cd openwrt
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
-          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
+          
+          # 💡 优化：过滤掉 rclone 和 passwall(v1) 及其子组件，保持清单干净
+          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | grep -v "passwall_INCLUDE" | grep -v "passwall2_INCLUDE" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           
           # 获取关键插件版本号函数
-          # ── 通用函数（passwall2、kucat 直接用这个就够）──────────────────
           get_pkg_ver() {
             local pkg=$1
-            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
-                        | grep "Version:" | awk '{print $2}' | head -1)
+            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null | grep "Version:" | awk '{print $2}' | head -1)
             if [ -z "$ver" ]; then
               local mk=$(find package/ feeds/ -name "Makefile" -path "*/$pkg/*" 2>/dev/null | head -1)
               if [ -n "$mk" ]; then
@@ -212,71 +213,12 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-
-          # ── MosDNS 本体（mosdns/Makefile，排除 luci-app-mosdns）──────────
-          get_mosdns_core_ver() {
-            local ver=""
-            if command -v apk >/dev/null 2>&1; then
-              ver=$(apk list -I 2>/dev/null | grep "^mosdns-[0-9]" | head -1 \
-                    | awk '{print $1}' | sed 's/^mosdns-//')
-              [ -n "$ver" ] && { echo "$ver"; return; }
-            fi
-            local mk=$(find feeds/ package/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
-                       | grep -v "luci-app-mosdns" | head -1)
-            if [ -n "$mk" ]; then
-              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              [ -n "$rel" ] && ver="${ver}-${rel}"
-            fi
-            echo "${ver:-Unknown}"
-          }
-
-          # ── SmartDNS 本体（smartdns 包，非 luci-app-smartdns）────────────
-          get_smartdns_core_ver() {
-            local ver=""
-            if command -v apk >/dev/null 2>&1; then
-              ver=$(apk list -I 2>/dev/null | grep "^smartdns-[0-9]" | head -1 \
-                    | awk '{print $1}' | sed 's/^smartdns-//')
-              [ -n "$ver" ] && { echo "$ver"; return; }
-            fi
-            local mk=$(find feeds/ package/ -type f -path "*/smartdns/Makefile" 2>/dev/null \
-                       | grep -v "luci-app-smartdns" | head -1)
-            if [ -n "$mk" ]; then
-              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              [ -n "$rel" ] && ver="${ver}-${rel}"
-            fi
-            echo "${ver:-Unknown}"
-          }
-
-          # ── ksmbd（官方 feeds，三级回退）────────────────────────────────
-          get_ksmbd_ver() {
-            local ver=""
-            if command -v apk >/dev/null 2>&1; then
-              ver=$(apk list -I 2>/dev/null | grep "^luci-app-ksmbd-[0-9]" | head -1 \
-                    | awk '{print $1}' | sed 's/^luci-app-ksmbd-//')
-              [ -n "$ver" ] && { echo "$ver"; return; }
-            fi
-            ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
-                  | grep "Version:" | awk '{print $2}' | head -1)
-            [ -n "$ver" ] && { echo "$ver"; return; }
-            local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
-            if [ -n "$mk" ]; then
-              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              [ -n "$rel" ] && ver="${ver}-${rel}"
-            fi
-            echo "${ver:-Unknown}"
-          }
-
-          # ── 赋值 ────────────────────────────────────────────────────────
-          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")       # 默认函数 ✅ 不用改
-          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")        # 默认函数 ✅
-          VER_MOSDNS_CORE=$(get_mosdns_core_ver)                  # 专用函数 🆕
-          VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")    # 默认函数 ✅
-          VER_SMARTDNS_CORE=$(get_smartdns_core_ver)              # 专用函数 🆕
-          VER_KSMBD=$(get_ksmbd_ver)                              # 专用函数 🆕
-          VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")             # 默认函数 ✅ 不用改
+          
+          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
+          VER_MOSDNS=$(get_pkg_ver "luci-app-mosdns")
+          VER_SMARTDNS=$(get_pkg_ver "luci-app-smartdns")
+          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
+          VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
           
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
@@ -346,7 +288,7 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: 上传 Artifact (Upload Artifact)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
         with:
           name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
@@ -355,7 +297,7 @@ jobs:
             ${{ env.FIRMWARE }}/*.bin
 
       - name: 发布 Release (Publish Release)
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         # 💡 优化：去掉了 inputs.release 判断，只要编译成功就自动发布，防止遗漏
         if: steps.organize.outputs.status == 'success'
         env:
