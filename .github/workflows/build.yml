@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: '发布到 Release'
+        description: '发布到 Release (建议始终勾选)'
         required: true
         default: true
         type: boolean
@@ -18,16 +18,19 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: 检出代码 (Checkout)
+        uses: actions/checkout@v4
 
-      - name: Init build environment
+      - name: 初始化编译环境 (Init Environment)
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+          # 清理 Docker 镜像和预装软件以释放空间
           docker rmi $(docker images -q) 2>/dev/null || true
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
+          
+          # 更新软件源并安装编译依赖
           sudo apt update -y
           sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
@@ -42,23 +45,24 @@ jobs:
           sudo apt clean -y
           sudo timedatectl set-timezone "$TZ"
 
-      - name: Clone source code
+      - name: 克隆 ImmortalWrt 源码 (Clone Source)
         run: |
+          # 使用 blob:none 过滤以减少克隆体积和时间
           git clone --single-branch --filter=blob:none -b $REPO_BRANCH $REPO_URL openwrt
           cd openwrt
           echo "源码分支: $(git branch -a)"
           echo "最新提交: $(git log -1 --pretty=format:'%h %s')"
 
-      - name: DIY Part1 - 快速克隆源码 (Git Clone 模式)
+      - name: DIY Part1 - 快速克隆插件与源 (Fast Clone Plugins)
         run: |
           cd openwrt
           
-          # 1. MosDNS (替换官方源)
+          # 1. MosDNS (替换官方旧版)
           echo "===== 克隆 MosDNS ====="
           rm -rf ./feeds/packages/net/mosdns ./package/feeds/packages/mosdns
           git clone --depth=1 -b v5 https://github.com/sbwml/luci-app-mosdns.git package/luci-app-mosdns
           
-          # 2. Sirpdboy 插件集
+          # 2. Sirpdboy 插件集 (主题、向导、扩容等)
           echo "===== 克隆 Sirpdboy 插件 ====="
           git clone --depth=1 https://github.com/sirpdboy/luci-theme-kucat.git package/luci-theme-kucat
           git clone --depth=1 https://github.com/sirpdboy/luci-app-kucat-config.git package/luci-app-kucat-config
@@ -68,28 +72,24 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git package/luci-app-lucky
           
-          # 3. Bandix 插件
+          # 3. Bandix 带宽监控插件
           echo "===== 克隆 Bandix ====="
           git clone --depth=1 https://github.com/timsaya/openwrt-bandix.git package/openwrt-bandix
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
           
           # 4. 第三方 Feeds 源 (改为 Git Clone 模式以加速)
+          # 原理：直接克隆到 package 目录比在 feeds.conf 里配置 src-git 更快且更稳定
           echo "===== 克隆第三方 Feeds 源 ====="
-          # Passwall2
           git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall2.git package/openwrt-passwall2
-          # NAS & DDNSTO
           git clone --depth=1 https://github.com/linkease/nas-packages.git package/nas-packages
           git clone --depth=1 https://github.com/linkease/nas-packages-luci.git package/nas-packages-luci
-          # iStore
           git clone --depth=1 https://github.com/linkease/istore.git package/istore
-          # Fantastic (可选，如不需要可保持注释)
-          # git clone --depth=1 https://github.com/fantastic-packages/fantastic-packages-feeds.git package/fantastic-packages
 
-      - name: 配置 Feeds 源 (仅保留官方源)
+      - name: 配置 Feeds 源 (Configure Feeds)
         run: |
           cd openwrt
-          # 仅保留 ImmortalWrt 官方源以加快更新速度
-          # 注意：第三方源已在上面通过 git clone 获取，无需在此配置
+          # 仅保留 ImmortalWrt 官方核心源，第三方源已在上面通过 git clone 获取
+          # 这样 ./scripts/feeds update 只需要拉取少量索引，极大提升速度
           cat > feeds.conf.default <<EOF
           src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12
           src-git luci https://github.com/immortalwrt/luci.git;openwrt-25.12
@@ -99,41 +99,40 @@ jobs:
           echo "===== 当前 Feeds 配置 ====="
           cat feeds.conf.default
 
-      - name: 更新并安装 Feeds
+      - name: 更新并安装 Feeds (Update & Install Feeds)
         run: |
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           
-          # 验证关键包是否存在 (检查 git clone 和 feeds 安装的结果)
+          # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
           REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
-          
           for pkg in $REQUIRED_PKGS; do
-            # 检查 package/ 目录 (git clone) 或 feeds/ 目录
             if [ -d "package/$pkg" ] || [ -d "package/openwrt-passwall2/$pkg" ] || [ -d "package/nas-packages/$pkg" ] || [ -d "package/nas-packages-luci/$pkg" ] || [ -d "package/istore/$pkg" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
                echo "✅ $pkg 已就绪"
             else
-               # 备用检查：查询 feeds 列表
                if ./scripts/feeds list | grep -q "^$pkg "; then
                   echo "✅ $pkg 在 Feeds 中找到"
                else
                   echo "❌ $pkg 未找到"
-                  # exit 1 # 如果缺少关键包需要终止编译，请取消注释此行
                fi
             fi
           done
           echo "✅ 所有必需包验证通过"
-          echo "=================================="
 
-      - name: DIY Part2 - After feeds install
+      - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
+          # 将仓库根目录的 files 文件夹移动到编译目录，用于覆盖默认配置
           [ -d files ] && mv files openwrt/files || true
-          # ✅ 添加这一行，确保脚本有执行权限
+          
+          # 确保自定义脚本有执行权限
           if [ -f "openwrt/files/etc/uci-defaults/99-custom-init" ]; then
             chmod +x openwrt/files/etc/uci-defaults/99-custom-init
             echo "✅ 已赋予 99-custom-init 执行权限"
           fi
+          
+          # 执行用户自定义脚本 (如果存在)
           if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
             cd openwrt
@@ -142,7 +141,7 @@ jobs:
             echo "diy-part2.sh 不存在，跳过"
           fi
 
-      - name: Load device config
+      - name: 加载设备配置 (Load Device Config)
         run: |
           cd openwrt
           if [ -f ../.config ]; then
@@ -152,6 +151,8 @@ jobs:
             echo "⚠️ 未找到用户自定义 .config"
             exit 1
           fi
+          
+          # 强制指定目标设备为 RAX3000M
           cat >> .config <<EOF
           CONFIG_TARGET_mediatek=y
           CONFIG_TARGET_mediatek_filogic=y
@@ -159,7 +160,7 @@ jobs:
           EOF
           make defconfig
 
-      - name: Deep Clean Build Cache (Critical for Size Optimization)
+      - name: 深度清理缓存 (Deep Clean)
         run: |
           cd openwrt
           echo "===== 开始深度清理 ====="
@@ -169,43 +170,24 @@ jobs:
           rm -rf .ccache/ ~/.ccache/
           echo "✅ 清理完成，当前磁盘使用："
           df -h .
-          echo "========================="
-          echo ""
-          echo "========== 配置检查报告 =========="
-          echo "--- 目标设备 ---"
-          grep "CONFIG_TARGET.*DEVICE.*=y" .config | head -5
-          echo ""
-          echo "--- 被丢弃的包 (用户要求但未编入) ---"
-          comm -23 \
-            <(grep "^CONFIG_PACKAGE_.*=y" ../.config | sed 's/=y//' | sort) \
-            <(grep "^CONFIG_PACKAGE_.*=y" .config | sed 's/=y//' | sort) \
-            || echo "(无丢弃)"
-          echo ""
-          echo "--- 最终编入的 luci-app 插件 ---"
-          grep "^CONFIG_PACKAGE_luci-app-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo ""
-          echo "--- 最终编入的主题 ---"
-          grep "^CONFIG_PACKAGE_luci-theme-.*=y" .config | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo ""
-          echo "--- 最终编入的其他包 ---"
-          grep "^CONFIG_PACKAGE_.*=y" .config | grep -v "luci-app-\|luci-i18n-\|luci-theme-\|luci-lib-\|kmod-" | sed 's/CONFIG_PACKAGE_//;s/=y//' | sort
-          echo "=================================="
 
-      - name: Download package sources
+      - name: 下载编译源码 (Download Sources)
         run: |
           cd openwrt
           make download -j$(nproc)
+          # 清理小于 1KB 的损坏下载文件
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
 
-      - name: Compile firmware
+      - name: 编译固件 (Compile Firmware)
         run: |
           cd openwrt
+          # 多线程编译，失败后尝试单线程调试
           make -j$(nproc) || make -j1 V=s
           echo "===== 编译完成 ====="
           find bin/targets/ -type f \( -name "*.bin" -o -name "*.itb" \) | head -20
 
-      - name: Generate Release Notes
+      - name: 生成发布说明 (Generate Release Notes)
         id: notes
         run: |
           cd openwrt
@@ -214,12 +196,11 @@ jobs:
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           
-          # 【新增】获取关键插件版本号
+          # 获取关键插件版本号函数
           get_pkg_ver() {
             local pkg=$1
             local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null | grep "Version:" | awk '{print $2}' | head -1)
             if [ -z "$ver" ]; then
-               # 尝试从 Makefile 获取 (针对本地 clone 的包)
                local mk=$(find package/ feeds/ -name "Makefile" -path "*/$pkg/*" 2>/dev/null | head -1)
                if [ -n "$mk" ]; then
                  ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
@@ -238,6 +219,7 @@ jobs:
           
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
+          
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
           **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
           **Linux 内核**: $KERNEL_VER
@@ -246,30 +228,40 @@ jobs:
           **无线驱动**: mt76 开源驱动
           **固件格式**: .itb (FIT image)
           **包管理器**: apk (Alpine Package Keeper)
+          
           ---
+          
           ### 📦 核心插件版本
           - **Passwall2**: $VER_PASSWALL2
           - **MosDNS**: $VER_MOSDNS
           - **SmartDNS**: $VER_SMARTDNS
           - **Ksmbd**: $VER_KSMBD
           - **Kucat Theme**: $VER_KUCAT
+          
           ---
+          
           ### ⚠️ 刷机须知
           1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
           2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
           3. **升级固件**: 使用 sysupgrade.itb，建议不保留配置升级
           4. **默认地址**: 192.168.6.1
           5. **默认密码**: 无 (留空)
-          6. **Wi-Fi**: 自行查看
+          6. **Wi-Fi**: 请刷机后在后台查看或自行设置
           7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
           8. **U-Boot 文件**: 附件中的 \`bl2.img\` 和 \`fip.bin\` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd)
+          
           ---
+          
           ### 内置主题
           $THEMES
+          
           ---
+          
           ### 内置插件清单
           $PLUGINS
+          
           ---
+          
           ### 特性说明
           - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
           - ✅ KUCAT 酷猫主题，移动端优化
@@ -281,7 +273,7 @@ jobs:
           EOF
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
-      - name: Organize firmware files
+      - name: 整理固件文件 (Organize Files)
         id: organize
         run: |
           cd openwrt/bin/targets/*/*
@@ -292,17 +284,7 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # ==========================================
-      # 📦 步骤 A: 上传 Artifact (构建产物)
-      # ==========================================
-      # 💡 什么是 Artifact？
-      #    - 它是 GitHub Actions 运行时的【临时存档】。
-      #    - 只有登录 GitHub 的人能在 Actions 页面下载。
-      #    - 默认 90 天后自动删除（可配置）。
-      #    - 用途：用于开发者自己测试、调试，或者作为 Release 的备份。
-      #    - 特点：不需要审批，编译完自动生成，速度快。
-      # ==========================================
-      - name: Upload firmware artifact
+      - name: 上传 Artifact (Upload Artifact)
         uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
         with:
@@ -311,23 +293,9 @@ jobs:
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
 
-
-      # ==========================================
-      # 🚀 步骤 B: 发布 Release (正式发行版)
-      # ==========================================
-      # 💡 什么是 Release？
-      #    - 它是 GitHub 仓库的【正式版本】。
-      #    - 任何人（无需登录）都能在仓库主页 Releases 页面下载。
-      #    - 永久保存，不会自动删除。
-      #    - 用途：分发给最终用户使用。
-      #    - 特点：可以写详细的更新日志 (Release Notes)，附带固件文件。
-      # ==========================================
-      - name: Release to GitHub
+      - name: 发布 Release (Publish Release)
         uses: softprops/action-gh-release@v2
-        # 💡 修改说明：
-        #    原代码: if: ... && inputs.release == 'true' 
-        #    这意味着如果你手动运行时没勾选复选框，这一步就会被跳过（导致没有 Release）。
-        #    现代码: 只要编译成功 (status == 'success') 就自动发布，无需手动勾选，防止遗漏。
+        # 💡 优化：去掉了 inputs.release 判断，只要编译成功就自动发布，防止遗漏
         if: steps.organize.outputs.status == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
