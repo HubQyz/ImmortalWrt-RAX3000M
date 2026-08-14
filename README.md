@@ -25,32 +25,38 @@
 *   **主题界面**: 默认集成 **Kucat (酷猫)** 主题，美观且移动端适配良好。
 *   **网络优化**: 默认开启 IPv6、DNS 加速 (MosDNS + SmartDNS)、流量分载等优化。
 
-## 🧩 内置插件清单
+## 🧩 内置插件清单 (基于 Build #39 日志)
 
-本固件精简了不必要的组件，保留了最实用的功能：
+本固件精简了不必要的组件，仅保留最实用的功能：
 
-###  网络与代理
-*   **Passwall2**: 强大的科学上网工具，支持多种协议。
+### 🛡 网络与代理
+*   **Passwall2**: 强大的科学上网工具 (包含 Sing-Box, Xray, Haproxy 等核心)。
 *   **SmartDNS**: 防 DNS 劫持，提升解析速度。
-*   **MosDNS**: 本地 DNS 服务器，分流国内外域名。
-*   **DDNS-GO / DDNSTO**: 动态域名解析服务。
+*   **MosDNS**: 本地 DNS 服务器，分流国内外域名 (v5 版本)。
 *   **SQM**: 流量队列管理，解决游戏/视频卡顿 (Bufferbloat)。
+*   **Zerotier**: 虚拟局域网组建工具。
 
 ### 🛠 系统与管理
 *   **iStore**: 图形化应用商店，方便安装其他软件。
-*   **DiskMan**: 磁盘管理工具，支持挂载 NTFS/exFAT 硬盘。
+*   **Bandix**: 带宽监控与限制插件。
+*   **Taskplan**: 任务计划管理。
+*   **Netwizard**: 设置向导。
 *   **TTYD**: 网页终端，无需 SSH 客户端即可管理后台。
-*   **AutoCore**: 显示 CPU 温度、频率及负载信息。
+*   **Autoreboot**: 自动重启计划。
 *   **Lucky**: 多功能工具箱 (IPv6 DDNS, 端口转发, WakeOnLan 等)。
+*   **DDNSTO**: 内网穿透与远程访问服务。
+*   **WeChatPush**: 微信推送设备状态。
 
 ### 📂 存储与共享
 *   **Ksmbd**: 高性能内核级 Samba 服务器 (比 Samba4 更省资源)。
-*   **Rclone**: 网盘挂载工具 (支持 OneDrive, Google Drive 等)。
+*   **HD-Idle**: 硬盘休眠管理。
+*   **Partexp**: 分区扩容工具。
 
-### 🎨 其他
-*   **NetWizard**: 设置向导。
-*   **WeChatPush**: 微信推送设备状态。
-*   **EqosPlus**: 简单的 IP/MAC 限速工具。
+### 🎨 主题
+*   **Kucat**: 酷猫主题 (默认)。
+*   **Bootstrap**: 原生主题。
+
+> **注意**: 本固件已移除 DiskMan, DDNS-GO, Rclone 等非必要插件以保持精简。如需使用，可通过 iStore 或 apk 命令自行安装。
 
 ## ⚡ 刷机教程
 
