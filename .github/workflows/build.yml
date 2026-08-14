@@ -53,7 +53,6 @@ jobs:
         run: |
           cd openwrt
           
-          # ========== 【新增】克隆 MosDNS (sbwml) ==========
           echo "===== 克隆 MosDNS (sbwml) ====="
           # 删除源码自带的旧版 mosdns (防止冲突)
           rm -rf ./feeds/packages/net/mosdns
@@ -70,7 +69,6 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
-          # 【新增】克隆 Lucky (大吉) - 改为 git clone 方式
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git package/luci-app-lucky
           
           # ========== 克隆 bandix（核心后端 + LuCI 前端） ==========
@@ -84,7 +82,6 @@ jobs:
           # ========== 预检：确认本地克隆包是否存在 ==========
           echo ""
           echo "========== 本地克隆包预检 =========="
-          # 【修改】CLONE_PKGS 加入 luci-app-lucky 和 luci-app-mosdns
           CLONE_PKGS="luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-taskplan luci-app-eqosplus luci-app-lucky openwrt-bandix luci-app-bandix luci-app-mosdns"
           CLONE_MISSING=""
           for pkg in $CLONE_PKGS; do
