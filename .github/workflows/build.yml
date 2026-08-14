@@ -196,10 +196,11 @@ jobs:
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           
-          # 获取关键插件版本号函数（优先读已编译包信息，否则回退读 Makefile）
+          # 获取关键插件版本号函数
           get_pkg_ver() {
             local pkg=$1
-            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null | grep "Version:" | awk '{print $2}' | head -1)
+            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
+                        | grep "Version:" | awk '{print $2}' | head -1)
             if [ -z "$ver" ]; then
               local mk=$(find package/ feeds/ -name "Makefile" -path "*/$pkg/*" 2>/dev/null | head -1)
               if [ -n "$mk" ]; then
@@ -211,14 +212,13 @@ jobs:
             echo "${ver:-Unknown}"
           }
 
-          # ── MosDNS 专用：分别获取「本体」和「LuCI 前端」版本 ──────────────
-          # mosdns 本体  → mosdns/Makefile        (PKG_NAME:=mosdns)
-          # LuCI 前端    → luci-app-mosdns/Makefile (PKG_NAME:=luci-app-mosdns)
+          # MosDNS 本体版本（mosdns/Makefile，非 luci-app-mosdns）
           get_mosdns_core_ver() {
             local ver=$(grep -A 2 "Package: mosdns$" tmp/info/.files-packageinfo 2>/dev/null \
                         | grep "Version:" | awk '{print $2}' | head -1)
             if [ -z "$ver" ]; then
-              local mk=$(find package/ feeds/ -name "Makefile" -path "*/mosdns/Makefile" 2>/dev/null | head -1)
+              local mk=$(find package/ feeds/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
+                         | grep -v "luci-app-mosdns" | head -1)
               if [ -n "$mk" ]; then
                 ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
                 local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
@@ -228,11 +228,35 @@ jobs:
             echo "${ver:-Unknown}"
           }
 
+          # ksmbd 三级回退查找（来自官方 feeds，路径不确定）
+          get_ksmbd_ver() {
+            local ver=""
+            # 1. 编译产物索引
+            ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
+                  | grep "Version:" | awk '{print $2}' | head -1)
+            [ -n "$ver" ] && { echo "$ver"; return; }
+            # 2. feeds Makefile
+            local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="$ver-$rel"
+              [ -n "$ver" ] && { echo "$ver"; return; }
+            fi
+            # 3. ipk 文件名
+            local ipk=$(find bin/packages/ -name "luci-app-ksmbd_*.ipk" 2>/dev/null | head -1)
+            if [ -n "$ipk" ]; then
+              ver=$(echo "$ipk" | sed -n 's/.*luci-app-ksmbd_\([^_]*\)_all\.ipk/\1/p')
+              [ -n "$ver" ] && { echo "$ver"; return; }
+            fi
+            echo "Unknown"
+          }
+
           VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
-          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")   # LuCI 前端版本，如 1.7.4-1
-          VER_MOSDNS_CORE=$(get_mosdns_core_ver)              # 本体版本，    如 5.3.4-6
+          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")    # LuCI前端 如 1.7.4-1
+          VER_MOSDNS_CORE=$(get_mosdns_core_ver)               # 本体     如 5.3.4-6
           VER_SMARTDNS=$(get_pkg_ver "luci-app-smartdns")
-          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
+          VER_KSMBD=$(get_ksmbd_ver)                           # 三级回退
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
           
           cat > release_notes.txt <<EOF
