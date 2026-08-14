@@ -292,8 +292,18 @@ jobs:
           echo "FIRMWARE=$PWD" >> $GITHUB_ENV
           echo "status=success" >> $GITHUB_OUTPUT
 
+      # ==========================================
+      # 📦 步骤 A: 上传 Artifact (构建产物)
+      # ==========================================
+      # 💡 什么是 Artifact？
+      #    - 它是 GitHub Actions 运行时的【临时存档】。
+      #    - 只有登录 GitHub 的人能在 Actions 页面下载。
+      #    - 默认 90 天后自动删除（可配置）。
+      #    - 用途：用于开发者自己测试、调试，或者作为 Release 的备份。
+      #    - 特点：不需要审批，编译完自动生成，速度快。
+      # ==========================================
       - name: Upload firmware artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         if: steps.organize.outputs.status == 'success'
         with:
           name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
@@ -301,9 +311,24 @@ jobs:
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
 
+
+      # ==========================================
+      # 🚀 步骤 B: 发布 Release (正式发行版)
+      # ==========================================
+      # 💡 什么是 Release？
+      #    - 它是 GitHub 仓库的【正式版本】。
+      #    - 任何人（无需登录）都能在仓库主页 Releases 页面下载。
+      #    - 永久保存，不会自动删除。
+      #    - 用途：分发给最终用户使用。
+      #    - 特点：可以写详细的更新日志 (Release Notes)，附带固件文件。
+      # ==========================================
       - name: Release to GitHub
-        uses: softprops/action-gh-release@v3
-        if: steps.organize.outputs.status == 'success' && inputs.release == 'true'
+        uses: softprops/action-gh-release@v2
+        # 💡 修改说明：
+        #    原代码: if: ... && inputs.release == 'true' 
+        #    这意味着如果你手动运行时没勾选复选框，这一步就会被跳过（导致没有 Release）。
+        #    现代码: 只要编译成功 (status == 'success') 就自动发布，无需手动勾选，防止遗漏。
+        if: steps.organize.outputs.status == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
