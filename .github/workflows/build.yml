@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       release:
-        description: '发布到 Release (建议始终勾选，现已改为自动发布)'
-        required: false
+        description: '发布到 Release (建议始终勾选)'
+        required: true
         default: true
         type: boolean
 
@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: 检出代码 (Checkout)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 初始化编译环境 (Init Environment)
         env:
@@ -121,6 +121,7 @@ jobs:
             fi
           done
           echo "✅ 所有必需包验证通过"
+          # 注意：已移除旧的 CLONE_MISSING 检查逻辑，因为新版逻辑不依赖该变量
 
       - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
@@ -195,14 +196,15 @@ jobs:
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           
-          # 💡 优化：过滤掉 rclone 和 passwall(v1) 及其子组件，保持清单干净
-          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | grep -v "passwall_INCLUDE" | grep -v "passwall2_INCLUDE" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
+          # 过滤掉不需要的插件 (如 rclone, passwall v1 组件等)
+          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | grep -v "passwall_INCLUDE" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           
-          # 获取关键插件版本号函数
+          # ── 通用函数（passwall2、kucat 直接用这个就够）──────────────────
           get_pkg_ver() {
             local pkg=$1
-            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null | grep "Version:" | awk '{print $2}' | head -1)
+            local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
+              | grep "Version:" | awk '{print $2}' | head -1)
             if [ -z "$ver" ]; then
               local mk=$(find package/ feeds/ -name "Makefile" -path "*/$pkg/*" 2>/dev/null | head -1)
               if [ -n "$mk" ]; then
@@ -213,13 +215,57 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-          
+
+          # ── MosDNS 本体（mosdns/Makefile，排除 luci-app-mosdns）──────────
+          get_mosdns_core_ver() {
+            local ver=""
+            local mk=$(find feeds/ package/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
+              | grep -v "luci-app-mosdns" | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
+            fi
+            echo "${ver:-Unknown}"
+          }
+
+          # ── SmartDNS 本体（smartdns 包，非 luci-app-smartdns）────────────
+          get_smartdns_core_ver() {
+            local ver=""
+            local mk=$(find feeds/ package/ -type f -path "*/smartdns/Makefile" 2>/dev/null \
+              | grep -v "luci-app-smartdns" | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
+            fi
+            echo "${ver:-Unknown}"
+          }
+
+          # ── ksmbd（官方 feeds，三级回退）────────────────────────────────
+          get_ksmbd_ver() {
+            local ver=""
+            ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
+              | grep "Version:" | awk '{print $2}' | head -1)
+            [ -n "$ver" ] && { echo "$ver"; return; }
+            local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
+            fi
+            echo "${ver:-Unknown}"
+          }
+
+          # ── 赋值 ────────────────────────────────────────────────────────
           VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
-          VER_MOSDNS=$(get_pkg_ver "luci-app-mosdns")
-          VER_SMARTDNS=$(get_pkg_ver "luci-app-smartdns")
-          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
+          VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")
+          VER_MOSDNS_CORE=$(get_mosdns_core_ver)
+          VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")
+          VER_SMARTDNS_CORE=$(get_smartdns_core_ver)
+          VER_KSMBD=$(get_ksmbd_ver)
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
-          
+
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
           
@@ -236,8 +282,8 @@ jobs:
           
           ### 📦 核心插件版本
           - **Passwall2**: $VER_PASSWALL2
-          - **MosDNS**: $VER_MOSDNS
-          - **SmartDNS**: $VER_SMARTDNS
+          - **MosDNS**: $VER_MOSDNS_CORE (LuCI: $VER_MOSDNS_LUCI)
+          - **SmartDNS**: $VER_SMARTDNS_CORE (LuCI: $VER_SMARTDNS_LUCI)
           - **Ksmbd**: $VER_KSMBD
           - **Kucat Theme**: $VER_KUCAT
           
@@ -288,7 +334,7 @@ jobs:
           echo "status=success" >> $GITHUB_OUTPUT
 
       - name: 上传 Artifact (Upload Artifact)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: steps.organize.outputs.status == 'success'
         with:
           name: ImmortalWrt-RAX3000M-NAND-Official-25.12.1-${{ github.run_number }}
@@ -297,8 +343,8 @@ jobs:
             ${{ env.FIRMWARE }}/*.bin
 
       - name: 发布 Release (Publish Release)
-        uses: softprops/action-gh-release@v2
-        # 💡 优化：去掉了 inputs.release 判断，只要编译成功就自动发布，防止遗漏
+        uses: softprops/action-gh-release@v3
+        # 💡 优化：只要编译成功就自动发布，防止遗漏
         if: steps.organize.outputs.status == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
