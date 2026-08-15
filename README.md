@@ -30,7 +30,7 @@
 本固件精简了不必要的组件，仅保留最实用的功能：
 
 ### 🛡 网络与代理
-*   **Passwall2**: 强大的科学上网工具 (包含 Sing-Box, Xray, Haproxy 等核心)。
+*   **HomeProxy**: 强大的科学上网工具 (Sing-Box核心)。
 *   **SmartDNS**: 防 DNS 劫持，提升解析速度。
 *   **MosDNS**: 本地 DNS 服务器，分流国内外域名 (v5 版本)。
 *   **SQM**: 流量队列管理，解决游戏/视频卡顿 (Bufferbloat)。
