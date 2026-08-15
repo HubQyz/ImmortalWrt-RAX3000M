@@ -29,18 +29,17 @@ jobs:
           docker rmi $(docker images -q) 2>/dev/null || true
           sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           sudo docker image prune --all --force
-          
           # 更新软件源并安装编译依赖
           sudo apt update -y
           sudo apt full-upgrade -y
           sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-            bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
-            g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
-            libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
-            libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
-            ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
-            python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-            upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
+          bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+          g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+          libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+          ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+          python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+          upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
           sudo apt autoremove --purge -y
           sudo apt clean -y
           sudo timedatectl set-timezone "$TZ"
@@ -56,12 +55,10 @@ jobs:
       - name: DIY Part1 - 快速克隆插件与源 (Fast Clone Plugins)
         run: |
           cd openwrt
-          
           # 1. MosDNS (替换官方旧版)
           echo "===== 克隆 MosDNS ====="
           rm -rf ./feeds/packages/net/mosdns ./package/feeds/packages/mosdns
           git clone --depth=1 -b v5 https://github.com/sbwml/luci-app-mosdns.git package/luci-app-mosdns
-          
           # 2. Sirpdboy 插件集 (主题、向导、扩容等)
           echo "===== 克隆 Sirpdboy 插件 ====="
           git clone --depth=1 https://github.com/sirpdboy/luci-theme-kucat.git package/luci-theme-kucat
@@ -71,16 +68,13 @@ jobs:
           git clone --depth=1 https://github.com/sirpdboy/luci-app-taskplan.git package/luci-app-taskplan
           git clone --depth=1 https://github.com/sirpdboy/luci-app-eqosplus.git package/luci-app-eqosplus
           git clone --depth=1 https://github.com/sirpdboy/luci-app-lucky.git package/luci-app-lucky
-          
           # 3. Bandix 带宽监控插件
           echo "===== 克隆 Bandix ====="
           git clone --depth=1 https://github.com/timsaya/openwrt-bandix.git package/openwrt-bandix
           git clone --depth=1 https://github.com/timsaya/luci-app-bandix.git package/luci-app-bandix
-          
           # 4. 第三方 Feeds 源 (改为 Git Clone 模式以加速)
-          # 原理：直接克隆到 package 目录比在 feeds.conf 里配置 src-git 更快且更稳定
+          # 【已移除 passwall2】科学上网改用官方自带的 HomeProxy，无需第三方源
           echo "===== 克隆第三方 Feeds 源 ====="
-          git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall2.git package/openwrt-passwall2
           git clone --depth=1 https://github.com/linkease/nas-packages.git package/nas-packages
           git clone --depth=1 https://github.com/linkease/nas-packages-luci.git package/nas-packages-luci
           git clone --depth=1 https://github.com/linkease/istore.git package/istore
@@ -89,7 +83,6 @@ jobs:
         run: |
           cd openwrt
           # 仅保留 ImmortalWrt 官方核心源，第三方源已在上面通过 git clone 获取
-          # 这样 ./scripts/feeds update 只需要拉取少量索引，极大提升速度
           cat > feeds.conf.default <<EOF
           src-git packages https://github.com/immortalwrt/packages.git;openwrt-25.12
           src-git luci https://github.com/immortalwrt/luci.git;openwrt-25.12
@@ -104,13 +97,11 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          
           # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
-          REQUIRED_PKGS="luci-app-passwall2 luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
-          
+          REQUIRED_PKGS="luci-app-homeproxy adblock-fast luci-app-adblock-fast luci-i18n-adblock-fast-zh-cn gawk grep sed coreutils-sort luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
           for pkg in $REQUIRED_PKGS; do
-            if [ -d "package/$pkg" ] || [ -d "package/openwrt-passwall2/$pkg" ] || [ -d "package/nas-packages/$pkg" ] || [ -d "package/nas-packages-luci/$pkg" ] || [ -d "package/istore/$pkg" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
+            if [ -d "package/$pkg" ] || [ -d "package/nas-packages/$pkg" ] || [ -d "package/nas-packages-luci/$pkg" ] || [ -d "package/istore/$pkg" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
               echo "✅ $pkg 已就绪"
             else
               if ./scripts/feeds list | grep -q "^$pkg "; then
@@ -121,19 +112,16 @@ jobs:
             fi
           done
           echo "✅ 所有必需包验证通过"
-          # 注意：已移除旧的 CLONE_MISSING 检查逻辑，因为新版逻辑不依赖该变量
 
       - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
           # 将仓库根目录的 files 文件夹移动到编译目录，用于覆盖默认配置
           [ -d files ] && mv files openwrt/files || true
-          
           # 确保自定义脚本有执行权限
           if [ -f "openwrt/files/etc/uci-defaults/99-custom-init" ]; then
             chmod +x openwrt/files/etc/uci-defaults/99-custom-init
             echo "✅ 已赋予 99-custom-init 执行权限"
           fi
-          
           # 执行用户自定义脚本 (如果存在)
           if [ -f "$GITHUB_WORKSPACE/diy-part2.sh" ]; then
             chmod +x "$GITHUB_WORKSPACE/diy-part2.sh"
@@ -153,7 +141,6 @@ jobs:
             echo "⚠️ 未找到用户自定义 .config"
             exit 1
           fi
-          
           # 强制指定目标设备为 RAX3000M
           cat >> .config <<EOF
           CONFIG_TARGET_mediatek=y
@@ -195,12 +182,10 @@ jobs:
           cd openwrt
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
-          
-          # 过滤掉不需要的插件 (如 rclone, passwall v1 组件等)
-          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | grep -v "passwall_INCLUDE" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
+          # 过滤掉不需要的插件 (如 rclone 等)
+          PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
-          
-          # ── 通用函数（passwall2、kucat 直接用这个就够）──────────────────
+          # ── 通用函数 ──────────────────────────────────────────
           get_pkg_ver() {
             local pkg=$1
             local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
@@ -215,8 +200,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-
-          # ── MosDNS 本体（mosdns/Makefile，排除 luci-app-mosdns）──────────
+          # ── MosDNS 本体 ───────────────────────────────────────
           get_mosdns_core_ver() {
             local ver=""
             local mk=$(find feeds/ package/ -type f -path "*/mosdns/Makefile" 2>/dev/null \
@@ -228,8 +212,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-
-          # ── SmartDNS 本体（smartdns 包，非 luci-app-smartdns）────────────
+          # ── SmartDNS 本体 ─────────────────────────────────────
           get_smartdns_core_ver() {
             local ver=""
             local mk=$(find feeds/ package/ -type f -path "*/smartdns/Makefile" 2>/dev/null \
@@ -241,8 +224,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-
-          # ── ksmbd（官方 feeds，三级回退）────────────────────────────────
+          # ── ksmbd ─────────────────────────────────────────────
           get_ksmbd_ver() {
             local ver=""
             ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
@@ -256,19 +238,18 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-
-          # ── 赋值 ────────────────────────────────────────────────────────
-          VER_PASSWALL2=$(get_pkg_ver "luci-app-passwall2")
+          # ── 赋值 ──────────────────────────────────────────────
+          VER_HOMEPROXY=$(get_pkg_ver "luci-app-homeproxy")
+          VER_ADBLOCK_FAST=$(get_pkg_ver "adblock-fast")
+          VER_ADBLOCK_LUCI=$(get_pkg_ver "luci-app-adblock-fast")
           VER_MOSDNS_LUCI=$(get_pkg_ver "luci-app-mosdns")
           VER_MOSDNS_CORE=$(get_mosdns_core_ver)
           VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")
           VER_SMARTDNS_CORE=$(get_smartdns_core_ver)
           VER_KSMBD=$(get_ksmbd_ver)
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
-
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
-          
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
           **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
           **Linux 内核**: $KERNEL_VER
@@ -277,18 +258,15 @@ jobs:
           **无线驱动**: mt76 开源驱动
           **固件格式**: .itb (FIT image)
           **包管理器**: apk (Alpine Package Keeper)
-          
           ---
-          
           ### 📦 核心插件版本
-          - **Passwall2**: $VER_PASSWALL2
+          - **HomeProxy**: $VER_HOMEPROXY
+          - **AdBlock-Fast**: $VER_ADBLOCK_FAST (LuCI: $VER_ADBLOCK_LUCI)
           - **MosDNS**: $VER_MOSDNS_CORE (LuCI: $VER_MOSDNS_LUCI)
           - **SmartDNS**: $VER_SMARTDNS_CORE (LuCI: $VER_SMARTDNS_LUCI)
           - **Ksmbd**: $VER_KSMBD
           - **Kucat Theme**: $VER_KUCAT
-          
           ---
-          
           ### ⚠️ 刷机须知
           1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
           2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
@@ -298,19 +276,13 @@ jobs:
           6. **Wi-Fi**: 请刷机后在后台查看或自行设置
           7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
           8. **U-Boot 文件**: 附件中的 \`bl2.img\` 和 \`fip.bin\` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd)
-          
           ---
-          
           ### 内置主题
           $THEMES
-          
           ---
-          
           ### 内置插件清单
           $PLUGINS
-          
           ---
-          
           ### 特性说明
           - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
           - ✅ KUCAT 酷猫主题，移动端优化
@@ -318,6 +290,8 @@ jobs:
           - ✅ IPv6 支持完善，无已知严重 bug
           - ✅ 软件包管理器: apk (Alpine Package Keeper)
           - ✅ 内核 6.12 LTS，长期支持
+          - ✅ 科学上网: HomeProxy (官方自带，基于 Sing-box)
+          - ✅ 集成 AdBlock-Fast 高性能 DNS 广告拦截 (含 GNU 加速工具包)
           - ✅ 集成 MosDNS v5 (sbwml) 与 SmartDNS 双重 DNS 优化
           EOF
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
@@ -344,7 +318,6 @@ jobs:
 
       - name: 发布 Release (Publish Release)
         uses: softprops/action-gh-release@v3
-        # 💡 优化：只要编译成功就自动发布，防止遗漏
         if: steps.organize.outputs.status == 'success'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
