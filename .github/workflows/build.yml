@@ -112,7 +112,10 @@ jobs:
             fi
           done
           echo "✅ 所有必需包验证通过"
-
+          
+       # 备份包索引：Deep Clean 会删掉 tmp/，留这份给发布说明查版本用
+       cp tmp/info/.files-packageinfo "$GITHUB_WORKSPACE/.files-packageinfo"
+       
       - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
           # 将仓库根目录的 files 文件夹移动到编译目录，用于覆盖默认配置
@@ -180,6 +183,9 @@ jobs:
         id: notes
         run: |
           cd openwrt
+          # 还原 Deep Clean 前备份的包索引，供版本查询使用
+          mkdir -p tmp/info
+          [ -f "$GITHUB_WORKSPACE/.files-packageinfo" ] && cp "$GITHUB_WORKSPACE/.files-packageinfo" tmp/info/.files-packageinfo
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           # 过滤掉不需要的插件 (如 rclone 等)
