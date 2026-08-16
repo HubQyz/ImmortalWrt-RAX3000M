@@ -112,10 +112,10 @@ jobs:
             fi
           done
           echo "✅ 所有必需包验证通过"
-          
-       # 备份包索引：Deep Clean 会删掉 tmp/，留这份给发布说明查版本用
-       cp tmp/info/.files-packageinfo "$GITHUB_WORKSPACE/.files-packageinfo"
-       
+          # ★ 备份包索引：Deep Clean 会删掉 tmp/，留这份给发布说明查版本用
+          cp tmp/info/.files-packageinfo "$GITHUB_WORKSPACE/.files-packageinfo"
+          echo "✅ 包索引已备份"
+
       - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
           # 将仓库根目录的 files 文件夹移动到编译目录，用于覆盖默认配置
@@ -183,15 +183,18 @@ jobs:
         id: notes
         run: |
           cd openwrt
-          # 还原 Deep Clean 前备份的包索引，供版本查询使用
+          # ★ 还原包索引：Deep Clean 前备份的索引，供版本查询使用
           mkdir -p tmp/info
-          [ -f "$GITHUB_WORKSPACE/.files-packageinfo" ] && cp "$GITHUB_WORKSPACE/.files-packageinfo" tmp/info/.files-packageinfo
+          if [ -f "$GITHUB_WORKSPACE/.files-packageinfo" ]; then
+            cp "$GITHUB_WORKSPACE/.files-packageinfo" tmp/info/.files-packageinfo
+            echo "✅ 包索引已还原"
+          fi
           KERNEL_VER=$(grep "LINUX_VERSION-6.12" include/kernel-6.12 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || echo "6.12.x")
           SYSTEM_VER=$(cat version.date 2>/dev/null || echo "25.12-SNAPSHOT")
           # 过滤掉不需要的插件 (如 rclone 等)
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
-          # ── 通用函数 ──────────────────────────────────────────
+          # ── 通用函数（三级回退：包索引 → Makefile → 编译产物文件名）──
           get_pkg_ver() {
             local pkg=$1
             local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
@@ -202,6 +205,12 @@ jobs:
                 ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
                 local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
                 [ -n "$rel" ] && ver="$ver-$rel"
+              fi
+            fi
+            if [ -z "$ver" ]; then
+              local apkfile=$(find bin/ -name "$pkg-[0-9]*.apk" 2>/dev/null | head -1)
+              if [ -n "$apkfile" ]; then
+                ver=$(basename "$apkfile" | sed "s/^$pkg-//;s/\.apk$//")
               fi
             fi
             echo "${ver:-Unknown}"
@@ -235,7 +244,10 @@ jobs:
             local ver=""
             ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
               | grep "Version:" | awk '{print $2}' | head -1)
-            [ -n "$ver" ] && { echo "$ver"; return; }
+            if [ -n "$ver" ]; then
+              echo "$ver"
+              return 0
+            fi
             local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
             if [ -n "$mk" ]; then
               ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
