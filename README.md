@@ -75,6 +75,12 @@ ImmortalWrt-RAX3000M/
 ├── .github/workflows/
 │   └── build.yml                 # CI 工作流：更新检测 → 编译 → 发布 → 清理
 ├── .config                       # 软件包选择配置（固件定制核心）
+├── docs/
+│   └── images/                   # README 界面截图
+│       ├── 01-home.png           # KUCAT 首页
+│       ├── 02-homeproxy.png      # HomeProxy 设置页
+│       ├── 03-mosdns.png         # MosDNS 页面
+│       └── 04-kucat.png          # 酷猫主题设置
 ├── files/
 │   └── etc/uci-defaults/
 │       └── 99-custom-init        # 首次启动初始化脚本（IP/主机名/Wi-Fi/主题）
