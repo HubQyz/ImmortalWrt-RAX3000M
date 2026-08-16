@@ -1,111 +1,160 @@
-# ImmortalWrt RAX3000M NAND 自动编译固件
+# ImmortalWrt RAX3000M NAND · 官方 25.12 稳定版 · 自动编译固件
 
-[![Build Status](https://github.com/HubQyz/ImmortalWrt-RAX3000M/actions/workflows/build.yml/badge.svg)](https://github.com/HubQyz/ImmortalWrt-RAX3000M/actions)
-[![Release](https://img.shields.io/github/v/release/HubQyz/ImmortalWrt-RAX3000M?include_prereleases)](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases)
-[![Platform](https://img.shields.io/badge/Platform-MediaTek%20Filogic-blue)](https://github.com/immortalwrt/immortalwrt)
+[![Workflow](https://github.com/HubQyz/ImmortalWrt-RAX3000M/actions/workflows/build.yml/badge.svg)](https://github.com/HubQyz/ImmortalWrt-RAX3000M/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/HubQyz/ImmortalWrt-RAX3000M)](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases)
 
-基于 **ImmortalWrt** (OpenWrt 分支) 源码，专为 **CMCC RAX3000M (NAND版)** 路由器打造的自动化云编译固件。
+> 基于 ImmortalWrt 官方 **v25.12.1 稳定版**源码，面向 **CMCC RAX3000M（MT7981 / NAND 128M）** 的定制固件。
+> 每天自动检测上游更新：**有更新才编译，无更新跳过**，编译完成自动发布 Release。
 
-本项目利用 GitHub Actions 自动拉取最新源码进行编译，集成常用插件与优化配置，旨在提供稳定、高效且功能丰富的路由系统。
-
-## 📥 固件下载
-
-请前往 [Releases](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases) 页面下载最新固件。
-
-*   **sysupgrade.itb**: 用于在 U-Boot 或 OpenWrt 系统中升级（推荐）。
-*   **initramfs-recovery.itb**: 用于首次刷机或救砖（通过 U-Boot Web 恢复模式刷入）。
-*   **bl2.img / fip.bin**: 配套的 U-Boot 引导文件（来自 Yuzhii 适配版）。
-
-## 🚀 固件特性
-
-*   **核心版本**: 基于 ImmortalWrt `v25.12.1` (官方稳定版分支)。
-*   **内核版本**: Linux Kernel 6.12 LTS (长期支持)。
-*   **包管理器**: 使用新一代 `apk` (Alpine Package Keeper) 替代传统的 opkg。
-*   **无线驱动**: 采用开源 `mt76` 驱动，持续更新优化。
-*   **主题界面**: 默认集成 **Kucat (酷猫)** 主题，美观且移动端适配良好。
-*   **网络优化**: 默认开启 IPv6、DNS 加速 (MosDNS + SmartDNS)、流量分载等优化。
-
-## 🧩 内置插件清单 (基于 Build #39 日志)
-
-本固件精简了不必要的组件，仅保留最实用的功能：
-
-### 🛡 网络与代理
-*   **HomeProxy**: 强大的科学上网工具 (Sing-Box核心)。
-*   **SmartDNS**: 防 DNS 劫持，提升解析速度。
-*   **MosDNS**: 本地 DNS 服务器，分流国内外域名 (v5 版本)。
-*   **SQM**: 流量队列管理，解决游戏/视频卡顿 (Bufferbloat)。
-*   **Zerotier**: 虚拟局域网组建工具。
-
-### 🛠 系统与管理
-*   **iStore**: 图形化应用商店，方便安装其他软件。
-*   **Bandix**: 带宽监控与限制插件。
-*   **Taskplan**: 任务计划管理。
-*   **Netwizard**: 设置向导。
-*   **TTYD**: 网页终端，无需 SSH 客户端即可管理后台。
-*   **Autoreboot**: 自动重启计划。
-*   **Lucky**: 多功能工具箱 (IPv6 DDNS, 端口转发, WakeOnLan 等)。
-*   **DDNSTO**: 内网穿透与远程访问服务。
-*   **WeChatPush**: 微信推送设备状态。
-
-### 📂 存储与共享
-*   **Ksmbd**: 高性能内核级 Samba 服务器 (比 Samba4 更省资源)。
-*   **HD-Idle**: 硬盘休眠管理。
-*   **Partexp**: 分区扩容工具。
-
-### 🎨 主题
-*   **Kucat**: 酷猫主题 (默认)。
-*   **Bootstrap**: 原生主题。
-
-> **注意**: 本固件已移除 DiskMan, DDNS-GO, Rclone 等非必要插件以保持精简。如需使用，可通过 iStore 或 apk 命令自行安装。
-
-## ⚡ 刷机教程
-
-> **⚠️ 警告**: 刷机有风险，操作需谨慎。请务必先备份重要数据。
-
-### 1. 准备工作
-*   下载 Releases 中的 `initramfs-recovery.itb` 和 `sysupgrade.itb`。
-*   下载仓库中的 `uboot-yuzhii/bl2.img` 和 `uboot-yuzhii/fip.bin` (如果尚未刷入第三方 U-Boot)。
-
-### 2. 首次刷机 (从原厂固件)
-1.  **刷入 U-Boot**: 参考 [hanwckf/bl-mt798x](https://github.com/hanwckf/bl-mt798x) 或 Yuzhii 的教程，通过串口或原厂漏洞刷入第三方 U-Boot。
-2.  **进入恢复模式**: 按住 Reset 键通电，直到指示灯闪烁，进入 U-Boot Web 恢复模式 (通常是 192.168.1.1)。
-3.  **刷入过渡固件**: 在 Web 页面上传 `initramfs-recovery.itb` 并启动。
-4.  **刷入正式固件**: 进入 OpenWrt 后台 (192.168.6.1)，在“系统” -> “备份/升级”中上传 `sysupgrade.itb` 进行刷机。**注意：首次刷机建议不保留配置。**
-
-### 3. 后续升级
-*   直接在 OpenWrt 后台上传新的 `sysupgrade.itb` 即可。
-
-## ⚙️ 默认配置
-
-*   **LAN IP**: `192.168.6.1`
-*   **用户名**: `root`
-*   **密码**: *无* (首次登录请设置密码)
-*   **Wi-Fi 名称**: 刷机后自行查看
-*   **Wi-Fi 密码**: 刷机后自行查看
-
-## 🛠 自行编译
-
-本项目完全开源，您可以 Fork 本仓库并使用 GitHub Actions 自行编译：
-
-1.  Fork 本仓库。
-2.  进入 `Actions` 标签页。
-3.  选择 `Build ImmortalWrt RAX3000M NAND` 工作流。
-4.  点击 `Run workflow`，勾选 `发布到 Release` (可选)。
-5.  等待编译完成 (约 1-2 小时)，在 Releases 页面下载您自己的固件。
-
-## 🙏 致谢
-
-*   [ImmortalWrt](https://github.com/immortalwrt/immortalwrt): 优秀的 OpenWrt 分支。
-*   [hanwckf](https://github.com/hanwckf): 提供 MT798x 系列 U-Boot 及适配支持。
-*   [Yuzhii0718](https://github.com/Yuzhii0718): 提供优化的 U-Boot 版本。
-*   [sirpdboy](https://github.com/sirpdboy): 提供 Kucat 主题及多款实用插件。
-*   [sbwml](https://github.com/sbwml): 提供 MosDNS 插件维护。
-
-## 📄 许可证
-
-本项目遵循 [MIT License](LICENSE)。固件中包含的第三方软件遵循其各自的开源协议。
+- 📥 **固件下载**：[Releases](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases)
+- 🧬 内核：Linux 6.12 LTS ｜ 无线驱动：mt76 开源驱动 ｜ 包管理器：apk
+- 📦 固件格式：`.itb`（FIT image）｜ 平台：mediatek/filogic
 
 ---
-**Star History**
 
-如果这个固件对您有帮助，请给个 Star ⭐ 支持一下！
+## ✨ 特性一览
+
+- ✅ 官方 25.12 稳定版源码，非 SNAPSHOT，长期维护
+- ✅ KUCAT 酷猫主题（移动端优化）+ 中文界面
+- ✅ 科学上网：HomeProxy（官方自带，Sing-box 核心）
+- ✅ DNS 双重优化：MosDNS v5（sbwml）+ SmartDNS
+- ✅ 广告拦截：AdBlock-Fast + GNU 加速工具包（gawk/grep/sed/sort）
+- ✅ 局域网共享：Ksmbd（内核态 SMB，高性能低占用，替代 Samba4）
+- ✅ 实用工具集：Lucky / ZeroTier / DDNSTO / NetWizard / iStore / 微信推送 / 磁盘扩容 / 硬盘休眠 / SQM+EqosPlus 限速 / Bandix 实时带宽监控
+
+---
+
+## 📦 内置插件清单
+
+| 分类 | 插件 |
+|---|---|
+| 科学上网 | HomeProxy |
+| 广告拦截 | AdBlock-Fast（含 LuCI + 中文） |
+| DNS 优化 | MosDNS v5（含 v2dat / geoip / geosite）、SmartDNS |
+| 局域网共享 | Ksmbd（kmod + server + LuCI） |
+| 主题美化 | KUCAT 酷猫 + 主题设置插件 |
+| 远程访问 | DDNSTO 蒲公英旁路由组网、ZeroTier、Lucky（端口转发/DDNS/内网穿透） |
+| 磁盘管理 | PartExp 磁盘扩容、hd-idle 硬盘休眠 |
+| 系统工具 | NetWizard 设置向导、TaskPlan 定时任务、AutoReboot 定时重启、ttyd 终端、WeChatPush 微信推送 |
+| 监控统计 | vnStat2 流量统计、Bandix 实时带宽 |
+| 限速 QoS | SQM（Cake 队列）、EqosPlus |
+| 应用商店 | iStore |
+| 外接硬盘 | USB 存储 + ext4/exFAT/NTFS3 + block-mount + fdisk/e2fsprogs |
+
+---
+
+## ⚙️ 出厂默认设置
+
+| 项目 | 默认值 |
+|---|---|
+| 管理地址 | `192.168.6.1` |
+| 管理密码 | 无（留空） |
+| 主机名 | `ImmortalWrtQi` |
+| 默认主题 | KUCAT 酷猫 |
+| 2.4G Wi-Fi | `Taurus`（信道 6） |
+| 5G Wi-Fi | `Taurus_5G`（信道 40） |
+| Wi-Fi 密码 | `77585211314` |
+
+> 以上默认值由 [`files/etc/uci-defaults/99-custom-init`](files/etc/uci-defaults/99-custom-init) 在**首次启动时写入一次**，如需修改请编辑该文件后重新编译。
+
+---
+
+## 🗂 仓库结构
+
+```
+ImmortalWrt-RAX3000M/
+├── .github/workflows/
+│   └── build.yml                 # CI 工作流：更新检测 → 编译 → 发布 → 清理
+├── .config                       # 软件包选择配置（固件定制核心）
+├── files/
+│   └── etc/uci-defaults/
+│       └── 99-custom-init        # 首次启动初始化脚本（IP/主机名/Wi-Fi/主题）
+├── uboot-yuzhii/
+│   ├── bl2.img                   # U-Boot 文件（来自 Yuzhii0718/bl-mt798x-dhcpd）
+│   └── fip.bin
+└── README.md
+```
+
+---
+
+## 🤖 自动编译机制
+
+### 触发方式
+
+| 方式 | 说明 |
+|---|---|
+| ⏰ 定时触发 | 每天 **北京时间 03:00**（UTC 19:00）自动运行更新检测 |
+| 🖱 手动触发 | Actions → `Run workflow`，无条件完整编译 |
+
+### 更新检测（check job）
+
+定时触发后先计算**上游指纹**（以下仓库 SHA 拼接后的 md5），与上次发布记录在 Release 正文里的指纹比对，**任意一项变化才编译**：
+
+- 官方源码 tag `v25.12.1`
+- 官方 feeds 分支：`immortalwrt/luci`、`immortalwrt/packages`（openwrt-25.12）—— HomeProxy / Ksmbd / AdBlock-Fast 等插件的更新来源
+- 13 个第三方插件仓库：mosdns(v5)、kucat 系列、bandix 系列、istore 系列等
+
+| 上游事件 | 是否重编 |
+|---|---|
+| 官方 feeds 推送插件新版本 | ✅ 触发 |
+| 第三方插件仓库有新提交 | ✅ 触发 |
+| 官方发布新版（如 v25.12.2） | ❌ 不触发（钉死稳定版） |
+| 全部无更新 | ❌ 跳过，不浪费编译时间 |
+| 手动触发 | ✅ 无条件编译 |
+
+> 指纹以隐藏注释 `<!-- FP: xxx -->` 写入 Release 正文，**仅在发布成功后更新**，天然避免"编译失败却跳过下次"的问题。
+
+### 发布与清理
+
+- Release 命名：`ImmortalWrt-RAX3000M-NAND-Official-25.12.1-Build-<运行编号>`
+- 自动清理：**只保留最近 3 个 Release**（旧 tag 一并删除）
+- Artifact 仅保留 1 天，固件以下载 Release 附件为准
+- Release 说明自动生成：编译时间 / 内核版本 / 核心插件真实版本号（三层取值：包索引 → 编译产物文件名 → Makefile）
+
+---
+
+## 🔧 自定义指南
+
+| 需求 | 修改位置 |
+|---|---|
+| 增删插件 | 编辑根目录 `.config`（`CONFIG_PACKAGE_xxx=y`），提交后下次编译生效 |
+| 改 Wi-Fi 名称/密码、主机名、LAN IP | 编辑 `files/etc/uci-defaults/99-custom-init` |
+| 改自动编译时间 | 编辑 `build.yml` 中 `schedule.cron` |
+| 增删"更新检测"监控的仓库 | 编辑 `build.yml` check job 中的 `git ls-remote` 行 |
+| 更换设备型号 | 需同步修改 `build.yml` 中 `CONFIG_TARGET_*` 三行及 U-Boot 附件 |
+
+---
+
+## 🚀 刷机说明
+
+1. **U-Boot 要求**：需使用支持 `.itb` 格式的 U-Boot（如 hanwckf/bl-mt798x 20241115+）；仓库附带的 `bl2.img` / `fip.bin` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd)，仅供参考
+2. **首次刷机**：先刷 `initramfs-recovery.itb` 过渡，再刷 `sysupgrade.itb`
+3. **升级固件**：使用 `sysupgrade.itb`，**建议不保留配置**升级
+4. **包管理器**：25.12 起使用 **apk**，安装软件请用 `apk add xxx`（opkg 命令已不存在）
+
+---
+
+## ❓ 常见问题
+
+**Q：添加了定时任务为什么没有立刻编译？**
+A：cron 是"到点触发"，不是添加后立即运行。启用后的**第一个到点时刻**（北京 03:00）必然编译一次（旧 Release 无指纹），之后才按"有更新才编"运行。
+
+**Q：03:00 过了还没看到运行？**
+A：GitHub cron 高峰期可能延迟几十分钟；另外 schedule 只对**默认分支**生效，仓库 60 天无活动会暂停定时任务（push 一次即恢复），fork 仓库默认不启用。
+
+**Q：编译日志里 `gst1-plugins-base` 依赖警告？**
+A：feeds 元数据告警，不影响编译与固件，可忽略。
+
+**Q：Release 里某个插件版本显示 Unknown？**
+A：版本取值为三层回退（包索引 → bin 产物文件名 → Makefile），若仍 Unknown 说明该包未实际编译，请检查 `.config`。
+
+---
+
+## ⚠️ 免责声明
+
+本项目仅供学习交流使用，固件基于 ImmortalWrt 开源项目自动构建，不提供任何担保。
+请遵守当地法律法规，合理使用网络功能。因使用本固件造成的任何损失，作者不承担责任。
+
+---
+
+**鸣谢**：[ImmortalWrt](https://github.com/immortalwrt/immortalwrt) ・ [sbwml/luci-app-mosdns](https://github.com/sbwml/luci-app-mosdns) ・ [sirpdboy](https://github.com/sirpdboy) ・ [linkease](https://github.com/linkease) ・ [hanwckf/bl-mt798x](https://github.com/hanwckf/bl-mt798x)
