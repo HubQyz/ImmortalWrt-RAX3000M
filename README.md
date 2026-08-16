@@ -27,7 +27,7 @@
 ## 📷 界面预览
 
 <p align="center">
-<img width="49%" alt="01-home" src="https://github.com/user-attachments/assets/9c625206-8f34-4283-8acc-23f4f6090e7f" />
+<img width="49%" alt="01-home" src="https://github.com/user-attachments/assets/bca77d4d-0728-4d8c-a2a9-b964e802ab59" />
 <img width="49%" alt="02-homeproxy" src="https://github.com/user-attachments/assets/4c28c957-f4af-4f34-91e1-c488a5db5f57" />
 <img width="49%" alt="03-mosdns" src="https://github.com/user-attachments/assets/fa443581-983b-4a22-ab76-27aa379ccdc1" />
 <img width="49%" alt="04-kucat" src="https://github.com/user-attachments/assets/7274f0c1-e9e3-4db0-b001-64969c8240b7" />
