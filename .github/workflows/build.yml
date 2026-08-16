@@ -8,7 +8,7 @@ on:
         required: true
         default: true
         type: boolean
-  # ★ 新增：每天北京时间 03:00 自动检测上游更新 (UTC 19:00)
+  # ★ 每天北京时间 03:00 自动检测上游更新 (UTC 19:00)
   schedule:
     - cron: '0 19 * * *'
 
@@ -18,7 +18,7 @@ env:
   TZ: Asia/Shanghai
 
 jobs:
-  # ★ 新增：更新检测 job —— 有更新才编译，没更新整体跳过
+  # ★ 更新检测 job：有更新才编译，没更新整体跳过
   check:
     runs-on: ubuntu-22.04
     outputs:
@@ -28,12 +28,6 @@ jobs:
       - name: 检测上游更新 (Check Upstream)
         id: fp
         run: |
-          # 手动触发 → 无条件编译
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "build=true" >> $GITHUB_OUTPUT
-            echo "fp=manual" >> $GITHUB_OUTPUT
-            exit 0
-          fi
           # ★ 上游指纹：任意一项变化即重新编译
           NEW_FP=""
           # ① 官方源码 tag（钉死 25.12.1，官方发新版不触发）
@@ -57,7 +51,13 @@ jobs:
           NEW_FP+=$(git ls-remote https://github.com/linkease/istore HEAD | awk '{print $1}')
           NEW_FP=$(echo "$NEW_FP" | md5sum | awk '{print $1}')
           echo "新指纹: $NEW_FP"
-          # 读取上次发布时记录在 Release 正文里的旧指纹
+          # 手动触发 → 无条件编译，记录真实指纹
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            echo "fp=$NEW_FP" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # 定时触发 → 与上次发布记录的指纹比对
           OLD_FP=$(curl -s "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" \
             | grep -o 'FP: [a-f0-9]\+' | head -1 | awk '{print $2}')
           echo "旧指纹: $OLD_FP"
@@ -152,7 +152,7 @@ jobs:
           cd openwrt
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          # ★ 修改1：feeds update 会把官方旧版 mosdns 恢复回来，必须在 update/install 之后再删
+          # ★ 修复：feeds update 会把官方旧版 mosdns 恢复回来，必须在 update/install 之后再删
           rm -rf feeds/packages/net/mosdns package/feeds/packages/mosdns
           # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
@@ -206,7 +206,6 @@ jobs:
           CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
           EOF
           make defconfig
-          # ★ 修改2：删除"备份包索引"死代码（defconfig 不生成索引，该备份从未生效）
 
       - name: 深度清理缓存 (Deep Clean)
         run: |
@@ -239,9 +238,9 @@ jobs:
         id: notes
         run: |
           cd openwrt
-          # ★ 新增：接收 check job 的指纹，稍后写入 Release 正文（隐藏注释）
+          # ★ 接收 check job 的指纹，写入 Release 正文（隐藏注释）
           FP="${{ needs.check.outputs.fp }}"
-          # ★ 修改3：删除"还原包索引"死代码；修复内核版本、系统版本(时间戳)两个 bug
+          # ★ 修复：内核版本、系统版本(时间戳)两个 bug
           KERNEL_VER=$(grep -rh "^LINUX_VERSION" include/kernel-* 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' ')
           [ -z "$KERNEL_VER" ] && KERNEL_VER="6.12.x"
 
@@ -255,7 +254,7 @@ jobs:
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
           # ── 通用函数 ──────────────────────────────────────────
-          # ★ 修改4：get_pkg_ver 增加"编译产物文件名"回退层（解决 homeproxy/ksmbd Unknown），修复 "-1" 拼接 bug
+          # ★ 修复：增加"编译产物文件名"回退层（解决 homeproxy/ksmbd Unknown），修复 "-1" 拼接 bug
           get_pkg_ver() {
             local pkg=$1 ver=""
             # 1) 包索引（保留，万一存在）
@@ -280,7 +279,7 @@ jobs:
             echo "${ver:-Unknown}"
           }
           # ── MosDNS 本体 ───────────────────────────────────────
-          # ★ 修改5：直接读 sbwml 克隆路径，避免误读 feeds 里恢复出来的官方旧版
+          # ★ 修复：直接读 sbwml 克隆路径，避免误读 feeds 里恢复出来的官方旧版
           get_mosdns_core_ver() {
             local ver=""
             local mk="package/luci-app-mosdns/mosdns/Makefile"
@@ -304,7 +303,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-          # ── 赋值（【本次】ksmbd 改用通用函数，get_ksmbd_ver 已删除）──
+          # ── 赋值 ──
           VER_HOMEPROXY=$(get_pkg_ver "luci-app-homeproxy")
           VER_ADBLOCK_FAST=$(get_pkg_ver "adblock-fast")
           VER_ADBLOCK_LUCI=$(get_pkg_ver "luci-app-adblock-fast")
