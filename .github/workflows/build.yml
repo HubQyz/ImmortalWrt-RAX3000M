@@ -239,23 +239,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-          # ── ksmbd ─────────────────────────────────────────────
-          get_ksmbd_ver() {
-            local ver=""
-            ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
-              | grep "Version:" | awk '{print $2}' | head -1)
-            if [ -n "$ver" ]; then
-              echo "$ver"
-              return 0
-            fi
-            local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
-            if [ -n "$mk" ]; then
-              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
-              [ -n "$rel" ] && ver="${ver}-${rel}"
-            fi
-            echo "${ver:-Unknown}"
-          }
+          
           # ── 赋值 ──────────────────────────────────────────────
           VER_HOMEPROXY=$(get_pkg_ver "luci-app-homeproxy")
           VER_ADBLOCK_FAST=$(get_pkg_ver "adblock-fast")
@@ -264,7 +248,7 @@ jobs:
           VER_MOSDNS_CORE=$(get_mosdns_core_ver)
           VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")
           VER_SMARTDNS_CORE=$(get_smartdns_core_ver)
-          VER_KSMBD=$(get_ksmbd_ver)
+          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
