@@ -53,7 +53,7 @@
 | 默认主题 | KUCAT 酷猫 |
 | 2.4G Wi-Fi | `Taurus`（信道 6） |
 | 5G Wi-Fi | `Taurus_5G`（信道 40） |
-| Wi-Fi 密码 | `77585211314` |
+| Wi-Fi 密码 | `请刷机后自行查看` |
 
 > 以上默认值由 [`files/etc/uci-defaults/99-custom-init`](files/etc/uci-defaults/99-custom-init) 在**首次启动时写入一次**，如需修改请编辑该文件后重新编译。
 
