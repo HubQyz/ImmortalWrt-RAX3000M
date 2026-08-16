@@ -8,6 +8,9 @@ on:
         required: true
         default: true
         type: boolean
+  # ★ 新增：每天北京时间 03:00 自动检测上游更新 (UTC 19:00)
+  schedule:
+    - cron: '0 19 * * *'
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
@@ -15,8 +18,60 @@ env:
   TZ: Asia/Shanghai
 
 jobs:
+  # ★ 新增：更新检测 job —— 有更新才编译，没更新整体跳过
+  check:
+    runs-on: ubuntu-22.04
+    outputs:
+      build: ${{ steps.fp.outputs.build }}
+      fp: ${{ steps.fp.outputs.fp }}
+    steps:
+      - name: 检测上游更新 (Check Upstream)
+        id: fp
+        run: |
+          # 手动触发 → 无条件编译
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+            echo "fp=manual" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # ★ 上游指纹：任意一项变化即重新编译
+          NEW_FP=""
+          # ① 官方源码 tag（钉死 25.12.1，官方发新版不触发）
+          NEW_FP+=$(git ls-remote $REPO_URL refs/tags/$REPO_BRANCH | awk '{print $1}')
+          # ② 官方 feeds 分支（homeproxy/ksmbd/adblock-fast 等插件更新来源）
+          NEW_FP+=$(git ls-remote https://github.com/immortalwrt/luci refs/heads/openwrt-25.12 | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/immortalwrt/packages refs/heads/openwrt-25.12 | awk '{print $1}')
+          # ③ 第三方插件仓库（与 DIY Part1 克隆列表对应）
+          NEW_FP+=$(git ls-remote https://github.com/sbwml/luci-app-mosdns refs/heads/v5 | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-theme-kucat HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-kucat-config HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-netwizard HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-partexp HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-taskplan HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-eqosplus HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/sirpdboy/luci-app-lucky HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/timsaya/openwrt-bandix HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/timsaya/luci-app-bandix HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages-luci HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/linkease/istore HEAD | awk '{print $1}')
+          NEW_FP=$(echo "$NEW_FP" | md5sum | awk '{print $1}')
+          echo "新指纹: $NEW_FP"
+          # 读取上次发布时记录在 Release 正文里的旧指纹
+          OLD_FP=$(curl -s "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest" \
+            | grep -o 'FP: [a-f0-9]\+' | head -1 | awk '{print $2}')
+          echo "旧指纹: $OLD_FP"
+          if [ "$NEW_FP" != "$OLD_FP" ]; then
+            echo "build=true" >> $GITHUB_OUTPUT
+          else
+            echo "build=false" >> $GITHUB_OUTPUT
+          fi
+          echo "fp=$NEW_FP" >> $GITHUB_OUTPUT
+
   build:
     runs-on: ubuntu-22.04
+    needs: check
+    if: needs.check.outputs.build == 'true'
     steps:
       - name: 检出代码 (Checkout)
         uses: actions/checkout@v7
@@ -184,6 +239,8 @@ jobs:
         id: notes
         run: |
           cd openwrt
+          # ★ 新增：接收 check job 的指纹，稍后写入 Release 正文（隐藏注释）
+          FP="${{ needs.check.outputs.fp }}"
           # ★ 修改3：删除"还原包索引"死代码；修复内核版本、系统版本(时间戳)两个 bug
           KERNEL_VER=$(grep -rh "^LINUX_VERSION" include/kernel-* 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' ')
           [ -z "$KERNEL_VER" ] && KERNEL_VER="6.12.x"
@@ -313,6 +370,8 @@ jobs:
           - ✅ 科学上网: HomeProxy (官方自带，基于 Sing-box)
           - ✅ 集成 AdBlock-Fast 高性能 DNS 广告拦截 (含 GNU 加速工具包)
           - ✅ 集成 MosDNS v5 (sbwml) 与 SmartDNS 双重 DNS 优化
+
+          <!-- FP: $FP -->
           EOF
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
 
@@ -335,6 +394,7 @@ jobs:
           path: |
             ${{ env.FIRMWARE }}/*.itb
             ${{ env.FIRMWARE }}/*.bin
+          retention-days: 1
 
       - name: 发布 Release (Publish Release)
         uses: softprops/action-gh-release@v3
@@ -350,3 +410,13 @@ jobs:
             ${{ env.FIRMWARE }}/*.bin
             uboot-yuzhii/bl2.img
             uboot-yuzhii/fip.bin
+
+      # ★ 新增：只保留最近 3 个 Release，自动删除旧的（含 tag）
+      - name: 清理旧 Release (Clean Old Releases)
+        uses: dev-drprasad/delete-older-releases@v1.5
+        if: steps.organize.outputs.status == 'success'
+        with:
+          keep_latest: 3
+          delete_tags: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
