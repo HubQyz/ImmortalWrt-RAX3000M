@@ -100,11 +100,12 @@ jobs:
           # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
           REQUIRED_PKGS="luci-app-homeproxy adblock-fast luci-app-adblock-fast luci-i18n-adblock-fast-zh-cn gawk grep sed coreutils-sort luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
+          ./scripts/feeds list > /tmp/feeds-list.txt 2>/dev/null || true
           for pkg in $REQUIRED_PKGS; do
-            if [ -d "package/$pkg" ] || [ -d "package/nas-packages/$pkg" ] || [ -d "package/nas-packages-luci/$pkg" ] || [ -d "package/istore/$pkg" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
+            if [ -n "$(find package -maxdepth 3 -type d -name "$pkg" 2>/dev/null | head -n 1)" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
               echo "✅ $pkg 已就绪"
             else
-              if ./scripts/feeds list | grep -q "^$pkg "; then
+              if grep -q "^$pkg " /tmp/feeds-list.txt 2>/dev/null; then
                 echo "✅ $pkg 在 Feeds 中找到"
               else
                 echo "❌ $pkg 未找到"
@@ -112,9 +113,6 @@ jobs:
             fi
           done
           echo "✅ 所有必需包验证通过"
-          # ★ 备份包索引：Deep Clean 会删掉 tmp/，留这份给发布说明查版本用
-          cp tmp/info/.files-packageinfo "$GITHUB_WORKSPACE/.files-packageinfo"
-          echo "✅ 包索引已备份"
 
       - name: DIY Part2 - 加载自定义文件 (Load Custom Files)
         run: |
@@ -151,6 +149,13 @@ jobs:
           CONFIG_TARGET_mediatek_filogic_DEVICE_cmcc_rax3000m=y
           EOF
           make defconfig
+          # ★ 备份包索引：索引在 defconfig 后才生成（上次错在 Feeds 阶段就 cp）；if 保护，缺失只警告不报错
+          if [ -f tmp/info/.files-packageinfo ]; then
+            cp tmp/info/.files-packageinfo "$GITHUB_WORKSPACE/.files-packageinfo"
+            echo "✅ 包索引已备份"
+          else
+            echo "⚠️ 包索引未生成，跳过备份（不影响编译）"
+          fi
 
       - name: 深度清理缓存 (Deep Clean)
         run: |
@@ -183,7 +188,7 @@ jobs:
         id: notes
         run: |
           cd openwrt
-          # ★ 还原包索引：Deep Clean 前备份的索引，供版本查询使用
+          # ★ 还原包索引：Deep Clean 删了 tmp/，写说明前还原；if 保护，缺失只警告不报错
           mkdir -p tmp/info
           if [ -f "$GITHUB_WORKSPACE/.files-packageinfo" ]; then
             cp "$GITHUB_WORKSPACE/.files-packageinfo" tmp/info/.files-packageinfo
@@ -194,7 +199,7 @@ jobs:
           # 过滤掉不需要的插件 (如 rclone 等)
           PLUGINS=$(grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | grep -v "rclone" | sed 's/CONFIG_PACKAGE_//g;s/=y//g' | sort | sed 's/^/- /')
           THEMES=$(grep "CONFIG_PACKAGE_luci-theme-" .config | grep "=y" | sed 's/CONFIG_PACKAGE_//;s/=y//g' | sort | sed 's/^/- /')
-          # ── 通用函数（三级回退：包索引 → Makefile → 编译产物文件名）──
+          # ── 通用函数 ──────────────────────────────────────────
           get_pkg_ver() {
             local pkg=$1
             local ver=$(grep -A 2 "Package: $pkg$" tmp/info/.files-packageinfo 2>/dev/null \
@@ -205,12 +210,6 @@ jobs:
                 ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
                 local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
                 [ -n "$rel" ] && ver="$ver-$rel"
-              fi
-            fi
-            if [ -z "$ver" ]; then
-              local apkfile=$(find bin/ -name "$pkg-[0-9]*.apk" 2>/dev/null | head -1)
-              if [ -n "$apkfile" ]; then
-                ver=$(basename "$apkfile" | sed "s/^$pkg-//;s/\.apk$//")
               fi
             fi
             echo "${ver:-Unknown}"
@@ -239,7 +238,20 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-          
+          # ── ksmbd ─────────────────────────────────────────────
+          get_ksmbd_ver() {
+            local ver=""
+            ver=$(grep -A 2 "Package: luci-app-ksmbd$" tmp/info/.files-packageinfo 2>/dev/null \
+              | grep "Version:" | awk '{print $2}' | head -1)
+            [ -n "$ver" ] && { echo "$ver"; return; }
+            local mk=$(find feeds/ package/ -type f -path "*/luci-app-ksmbd/Makefile" 2>/dev/null | head -1)
+            if [ -n "$mk" ]; then
+              ver=$(grep "PKG_VERSION" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              local rel=$(grep "PKG_RELEASE" "$mk" | head -1 | awk -F':=' '{print $2}' | tr -d ' ')
+              [ -n "$rel" ] && ver="${ver}-${rel}"
+            fi
+            echo "${ver:-Unknown}"
+          }
           # ── 赋值 ──────────────────────────────────────────────
           VER_HOMEPROXY=$(get_pkg_ver "luci-app-homeproxy")
           VER_ADBLOCK_FAST=$(get_pkg_ver "adblock-fast")
@@ -248,7 +260,7 @@ jobs:
           VER_MOSDNS_CORE=$(get_mosdns_core_ver)
           VER_SMARTDNS_LUCI=$(get_pkg_ver "luci-app-smartdns")
           VER_SMARTDNS_CORE=$(get_smartdns_core_ver)
-          VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
+          VER_KSMBD=$(get_ksmbd_ver)
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
