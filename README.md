@@ -24,6 +24,15 @@
 
 ---
 
+## 📷 界面预览
+
+<p align="center">
+<img width="49%" alt="01-home" src="https://github.com/user-attachments/assets/43d850ce-4ae5-4d1c-aa5d-3d4610dafc9d" />
+<img width="49%" alt="02-homeproxy" src="https://github.com/user-attachments/assets/4c28c957-f4af-4f34-91e1-c488a5db5f57" />
+<img width="49%" alt="03-mosdns" src="https://github.com/user-attachments/assets/fa443581-983b-4a22-ab76-27aa379ccdc1" />
+<img width="49%" alt="04-kucat" src="https://github.com/user-attachments/assets/7274f0c1-e9e3-4db0-b001-64969c8240b7" />
+</p>
+
 ## 📦 内置插件清单
 
 | 分类 | 插件 |
