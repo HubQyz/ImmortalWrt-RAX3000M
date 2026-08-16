@@ -72,8 +72,10 @@
 
 ```
 ImmortalWrt-RAX3000M/
-├── .github/workflows/
-│   └── build.yml                 # CI 工作流：更新检测 → 编译 → 发布 → 清理
+├── .github/
+│   ├── workflows/
+│   │   └── build.yml             # CI 工作流：更新检测 → 编译 → 发布 → 清理
+│   └── AI-SKILL.md               # AI 答复准则（新谈话首条粘贴 / 自定义指令备份）
 ├── .config                       # 软件包选择配置（固件定制核心）
 ├── docs/
 │   └── images/                   # README 界面截图
