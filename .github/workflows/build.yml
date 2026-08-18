@@ -8,9 +8,9 @@ on:
         required: true
         default: true
         type: boolean
-  # ★ 每天北京时间 03:00 自动检测上游更新 (UTC 19:00)
+  # ★ 每周六北京时间 02:38 自动检测上游更新 (UTC 周五 18:38)
   schedule:
-    - cron: '0 19 * * *'
+    - cron: '38 18 * * 5'
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
