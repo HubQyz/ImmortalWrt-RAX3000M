@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/HubQyz/ImmortalWrt-RAX3000M)](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases)
 
 > 基于 ImmortalWrt 官方 **v25.12.1 稳定版**源码，面向 **CMCC RAX3000M（MT7981 / NAND 128M）** 的定制固件。
-> 每天自动检测上游更新：**有更新才编译，无更新跳过**，编译完成自动发布 Release。
+> 每周自动检测上游更新：**有更新才编译，无更新跳过**，编译完成自动发布 Release。
 
 - 📥 **固件下载**：[Releases](https://github.com/HubQyz/ImmortalWrt-RAX3000M/releases)
 - 🧬 内核：Linux 6.12 LTS ｜ 无线驱动：mt76 开源驱动 ｜ 包管理器：apk
