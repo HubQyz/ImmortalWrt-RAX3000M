@@ -1,5 +1,4 @@
 name: Build ImmortalWrt RAX3000M NAND (Official 25.12 Stable)
-
 on:
   workflow_dispatch:
     inputs:
@@ -49,6 +48,9 @@ jobs:
           NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages-luci HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/linkease/istore HEAD | awk '{print $1}')
+          # ④ Argon 主题及配置插件更新检测
+          NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-theme-argon HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-app-argon-config HEAD | awk '{print $1}')
           NEW_FP=$(echo "$NEW_FP" | md5sum | awk '{print $1}')
           echo "新指纹: $NEW_FP"
           # 手动触发 → 无条件编译，记录真实指纹
@@ -133,6 +135,10 @@ jobs:
           git clone --depth=1 https://github.com/linkease/nas-packages.git package/nas-packages
           git clone --depth=1 https://github.com/linkease/nas-packages-luci.git package/nas-packages-luci
           git clone --depth=1 https://github.com/linkease/istore.git package/istore
+          # 5. Argon 主题及配置插件
+          echo "===== 克隆 Argon 主题 ====="
+          git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+          git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
 
       - name: 配置 Feeds 源 (Configure Feeds)
         run: |
@@ -156,7 +162,7 @@ jobs:
           rm -rf feeds/packages/net/mosdns package/feeds/packages/mosdns
           # 验证关键包是否存在
           echo "========== 依赖包验证 =========="
-          REQUIRED_PKGS="luci-app-homeproxy adblock-fast luci-app-adblock-fast luci-i18n-adblock-fast-zh-cn gawk grep sed coreutils-sort luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat"
+          REQUIRED_PKGS="luci-app-homeproxy adblock-fast luci-app-adblock-fast luci-i18n-adblock-fast-zh-cn gawk grep sed coreutils-sort luci-app-sqm luci-app-arpbind luci-app-ksmbd luci-theme-kucat luci-app-kucat-config luci-app-netwizard luci-app-partexp luci-app-eqosplus luci-app-bandix bandix luci-app-wechatpush luci-app-autoreboot luci-app-lucky luci-app-ddnsto ddnsto luci-app-mosdns mosdns v2dat luci-theme-argon luci-app-argon-config luci-i18n-argon-config-zh-cn"
           ./scripts/feeds list > /tmp/feeds-list.txt 2>/dev/null || true
           for pkg in $REQUIRED_PKGS; do
             if [ -n "$(find package -maxdepth 3 -type d -name "$pkg" 2>/dev/null | head -n 1)" ] || grep -rq "Package: $pkg" tmp/info/.files-packageinfo 2>/dev/null; then
@@ -243,7 +249,6 @@ jobs:
           # ★ 修复：内核版本、系统版本(时间戳)两个 bug
           KERNEL_VER=$(grep -rh "^LINUX_VERSION" include/kernel-* 2>/dev/null | head -1 | awk -F'=' '{print $2}' | tr -d ' ')
           [ -z "$KERNEL_VER" ] && KERNEL_VER="6.12.x"
-
           RAW_VER=$(cat version.date 2>/dev/null)
           if echo "$RAW_VER" | grep -qE '^[0-9]{9,}$'; then
             SYSTEM_VER=$(date -d "@$RAW_VER" +"%Y-%m-%d" 2>/dev/null || echo "25.12.1")
@@ -278,7 +283,7 @@ jobs:
             fi
             echo "${ver:-Unknown}"
           }
-          # ── MosDNS 本体 ───────────────────────────────────────
+          # ── MosDNS 本体 ──────────────────────────────────────
           # ★ 修复：直接读 sbwml 克隆路径，避免误读 feeds 里恢复出来的官方旧版
           get_mosdns_core_ver() {
             local ver=""
@@ -313,9 +318,9 @@ jobs:
           VER_SMARTDNS_CORE=$(get_smartdns_core_ver)
           VER_KSMBD=$(get_pkg_ver "luci-app-ksmbd")
           VER_KUCAT=$(get_pkg_ver "luci-theme-kucat")
+          VER_ARGON=$(get_pkg_ver "luci-theme-argon")
           cat > release_notes.txt <<EOF
           ### ImmortalWrt RAX3000M NAND 官方 25.12 稳定版固件
-
           **编译时间**: $(date +"%Y-%m-%d %H:%M:%S")
           **系统版本**: ImmortalWrt $SYSTEM_VER (官方 25.12.1 稳定版)
           **Linux 内核**: $KERNEL_VER
@@ -324,9 +329,7 @@ jobs:
           **无线驱动**: mt76 开源驱动
           **固件格式**: .itb (FIT image)
           **包管理器**: apk (Alpine Package Keeper)
-
           ---
-
           ### 📦 核心插件版本
           - **HomeProxy**: $VER_HOMEPROXY
           - **AdBlock-Fast**: $VER_ADBLOCK_FAST (LuCI: $VER_ADBLOCK_LUCI)
@@ -334,9 +337,8 @@ jobs:
           - **SmartDNS**: $VER_SMARTDNS_CORE (LuCI: $VER_SMARTDNS_LUCI)
           - **Ksmbd**: $VER_KSMBD
           - **Kucat Theme**: $VER_KUCAT
-
+          - **Argon Theme**: $VER_ARGON
           ---
-
           ### ⚠️ 刷机须知
           1. **U-Boot 要求**: 建议使用支持 .itb 格式的 U-Boot (如 hanwckf/bl-mt798x 20241115+)
           2. **首次刷机**: 使用 initramfs-recovery.itb 过渡，再刷 sysupgrade.itb
@@ -346,22 +348,17 @@ jobs:
           6. **Wi-Fi**: 请刷机后在后台查看或自行设置
           7. **注意**: 25.12 使用 apk 包管理器，不再是 opkg
           8. **U-Boot 文件**: 附件中的 \`bl2.img\` 和 \`fip.bin\` 来自 [Yuzhii0718/bl-mt798x-dhcpd](https://github.com/Yuzhii0718/bl-mt798x-dhcpd)
-
           ---
-
           ### 内置主题
           $THEMES
-
           ---
-
           ### 内置插件清单
           $PLUGINS
-
           ---
-
           ### 特性说明
           - ✅ 官方 ImmortalWrt 25.12 稳定版，持续更新
           - ✅ KUCAT 酷猫主题，移动端优化
+          - ✅ Argon 主题及配置插件，支持深色/浅色模式
           - ✅ mt76 开源无线驱动，社区维护
           - ✅ IPv6 支持完善，无已知严重 bug
           - ✅ 软件包管理器: apk (Alpine Package Keeper)
@@ -369,7 +366,6 @@ jobs:
           - ✅ 科学上网: HomeProxy (官方自带，基于 Sing-box)
           - ✅ 集成 AdBlock-Fast 高性能 DNS 广告拦截 (含 GNU 加速工具包)
           - ✅ 集成 MosDNS v5 (sbwml) 与 SmartDNS 双重 DNS 优化
-
           <!-- FP: $FP -->
           EOF
           echo "notes_file=$PWD/release_notes.txt" >> $GITHUB_OUTPUT
@@ -420,10 +416,10 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=100" \
             | jq -r '.[3:][] | "\(.id) \(.tag_name)"' | while read -r id tag; do
-              echo "删除旧 Release: $tag"
-              curl -s -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$id"
-              curl -s -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
-                "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$tag"
-            done
+            echo "删除旧 Release: $tag"
+            curl -s -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$id"
+            curl -s -X DELETE -H "Authorization: Bearer $GITHUB_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/git/refs/tags/$tag"
+          done
           echo "✅ 清理完成，仅保留最近 3 个 Release"
