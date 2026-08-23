@@ -139,7 +139,11 @@ jobs:
           echo "===== 克隆 Argon 主题 ====="
           git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
           git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
-
+          # ================= 新增 FlowLens 克隆代码 =================
+          echo "===== 克隆 FlowLens ====="
+          git clone --depth=1 -b main https://github.com/BlueSky16st/luci-app-flowlens.git package/luci-app-flowlen
+          # ==========================================================
+          
       - name: 配置 Feeds 源 (Configure Feeds)
         run: |
           cd openwrt
