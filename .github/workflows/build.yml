@@ -48,6 +48,8 @@ jobs:
           NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/linkease/nas-packages-luci HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/linkease/istore HEAD | awk '{print $1}')
+          # ★ 新增：OpenAppFilter 指纹检测
+          NEW_FP+=$(git ls-remote https://github.com/destan19/OpenAppFilter HEAD | awk '{print $1}')
           # ④ Argon 主题及配置插件更新检测
           NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-theme-argon HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-app-argon-config HEAD | awk '{print $1}')
@@ -135,6 +137,9 @@ jobs:
           git clone --depth=1 https://github.com/linkease/nas-packages.git package/nas-packages
           git clone --depth=1 https://github.com/linkease/nas-packages-luci.git package/nas-packages-luci
           git clone --depth=1 https://github.com/linkease/istore.git package/istore
+          # ★ 新增：OpenAppFilter (应用过滤/家长控制)
+          echo "===== 克隆 OpenAppFilter ====="
+          git clone --depth=1 https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter
           # 5. Argon 主题及配置插件
           echo "===== 克隆 Argon 主题 ====="
           git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
