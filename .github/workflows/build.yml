@@ -53,6 +53,7 @@ jobs:
           # ④ Argon 主题及配置插件更新检测
           NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-theme-argon HEAD | awk '{print $1}')
           NEW_FP+=$(git ls-remote https://github.com/jerrykuku/luci-app-argon-config HEAD | awk '{print $1}')
+          NEW_FP+=$(git ls-remote https://github.com/mrjoechen/luci-theme-carbon HEAD | awk '{print $1}')
           NEW_FP=$(echo "$NEW_FP" | md5sum | awk '{print $1}')
           echo "新指纹: $NEW_FP"
           # 手动触发 → 无条件编译，记录真实指纹
@@ -144,6 +145,7 @@ jobs:
           echo "===== 克隆 Argon 主题 ====="
           git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
           git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config.git package/luci-app-argon-config
+          git clone --depth=1 -b main https://github.com/mrjoechen/luci-theme-carbon.git package/luci-theme-carbon
           # ================= 新增 FlowLens 克隆代码 =================
           echo "===== 克隆 FlowLens ====="
           git clone --depth=1 -b main https://github.com/BlueSky16st/luci-app-flowlens.git package/luci-app-flowlen
